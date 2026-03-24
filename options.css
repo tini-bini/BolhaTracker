@@ -1,0 +1,294 @@
+/* ── Dark mode (default) ──────────────────────────────── */
+:root {
+  --bg: #090c0f;
+  --panel: #101419;
+  --panel-soft: #161b22;
+  --panel-hover: #1c222a;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.11);
+  --text: #eef0f4;
+  --muted: #7e8a98;
+  --soft: #b8c3ce;
+  --accent: #75b183;
+  --accent-hover: #87c095;
+  --accent-text: #0d1a10;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --ghost-hover: rgba(255, 255, 255, 0.05);
+  --input-focus: rgba(117, 177, 131, 0.35);
+  --toast-bg: #141a1f;
+  --accent-glow: rgba(117, 177, 131, 0.28);
+}
+
+/* ── Light mode ───────────────────────────────────────── */
+:root[data-theme="light"] {
+  --bg: #f0f5f1;
+  --panel: #ffffff;
+  --panel-soft: #e6f0e8;
+  --panel-hover: #dceede;
+  --border: rgba(0, 0, 0, 0.09);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --text: #121d14;
+  --muted: #4c6655;
+  --soft: #2c4436;
+  --accent: #4a8c59;
+  --accent-hover: #3d7a4c;
+  --accent-text: #ffffff;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.10);
+  --ghost-hover: rgba(0, 0, 0, 0.05);
+  --input-focus: rgba(74, 140, 89, 0.3);
+  --toast-bg: #ffffff;
+  --accent-glow: rgba(74, 140, 89, 0.22);
+}
+
+/* ── Reset ────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Aptos, "Segoe UI Variable", "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  transition: background 200ms ease, color 200ms ease;
+}
+
+.page {
+  width: min(960px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 28px 0 48px;
+}
+
+/* ── Hero ─────────────────────────────────────────────── */
+.hero {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.hero-copy {
+  margin: 0;
+  color: var(--muted);
+  max-width: 600px;
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* ── Panel ────────────────────────────────────────────── */
+.panel {
+  margin-bottom: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.split-panel,
+.diagnostics-grid,
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.section-head { margin-bottom: 12px; }
+
+.section-head h2, .diag-card h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.section-head p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+/* ── Fields ───────────────────────────────────────────── */
+.field, .toggle { display: grid; gap: 8px; }
+
+.field span, .toggle span { color: var(--soft); font-size: 12px; }
+
+.toggle {
+  grid-column: 1 / -1;
+  grid-template-columns: 18px 1fr;
+  align-items: center;
+}
+
+/* ── Inputs ───────────────────────────────────────────── */
+.input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--panel-soft);
+  color: var(--text);
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 100ms ease, background 200ms ease;
+}
+
+.input:focus { border-color: var(--input-focus); }
+
+/* ── Section actions ──────────────────────────────────── */
+.section-actions { margin-top: 16px; }
+
+/* ── Buttons ──────────────────────────────────────────── */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border: 0;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease,
+              box-shadow 100ms ease, color 100ms ease;
+}
+
+.button:disabled { opacity: 0.45; cursor: default; }
+
+.button-primary {
+  color: var(--accent-text);
+  background: var(--accent);
+  font-weight: 700;
+}
+.button-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.button-secondary {
+  color: var(--text);
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+}
+.button-secondary:hover:not(:disabled) {
+  background: var(--panel-hover);
+  border-color: var(--border-strong);
+}
+
+.button-donate {
+  color: var(--accent-text);
+  background: var(--accent);
+  font-weight: 700;
+  border: none;
+}
+.button-donate::before {
+  content: "♥";
+  font-size: 12px;
+  opacity: 0.85;
+}
+.button-donate:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.button-theme {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0;
+  font-size: 16px;
+  border-radius: 8px;
+  transition: background 100ms ease, color 100ms ease, border-color 100ms ease;
+}
+.button-theme:hover {
+  background: var(--ghost-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* ── Diag cards ───────────────────────────────────────── */
+.diag-card {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+}
+
+.code-block {
+  margin: 0;
+  min-height: 280px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: var(--soft);
+}
+
+.diagnostic-output {
+  display: grid;
+  gap: 10px;
+  color: var(--soft);
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.diag-list { display: grid; gap: 4px; }
+
+/* ── Toast ────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--toast-bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast-visible { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 900px) {
+  .split-panel, .diagnostics-grid, .form-grid {
+    grid-template-columns: 1fr;
+  }
+}

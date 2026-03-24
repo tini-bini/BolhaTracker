@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOLHA Price Tracker Settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div class="hero-top">
+          <div>
+            <p class="eyebrow" id="hero-byline"></p>
+            <h1 id="hero-title"></h1>
+          </div>
+          <div class="hero-actions">
+            <button class="button button-theme" id="theme-button" type="button" title="Toggle theme"></button>
+            <button class="button button-donate" id="donate-button" type="button"></button>
+          </div>
+        </div>
+        <p class="hero-copy" id="hero-subtitle"></p>
+      </header>
+
+      <section class="panel split-panel">
+        <div>
+          <div class="section-head">
+            <h2 id="guide-title"></h2>
+          </div>
+          <div class="diagnostic-output" id="guide-output"></div>
+        </div>
+        <div>
+          <div class="section-head">
+            <h2 id="roadmap-title"></h2>
+          </div>
+          <div class="diagnostic-output">
+            <div class="diag-list">
+              <strong id="roadmap-functionality-title"></strong>
+              <div id="roadmap-functionality-copy"></div>
+            </div>
+            <div class="diag-list">
+              <strong id="roadmap-design-title"></strong>
+              <div id="roadmap-design-copy"></div>
+            </div>
+            <div class="diag-list">
+              <strong id="roadmap-ease-title"></strong>
+              <div id="roadmap-ease-copy"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2 id="settings-title"></h2>
+          <p id="settings-help"></p>
+        </div>
+        <div class="form-grid">
+          <label class="field">
+            <span id="refresh-frequency-label"></span>
+            <select id="refresh-frequency" class="input"></select>
+          </label>
+          <label class="field">
+            <span id="language-label"></span>
+            <select id="language" class="input"></select>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="scheduled-refresh">
+            <span id="scheduled-refresh-label"></span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="notifications-enabled">
+            <span id="notifications-label"></span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="badge-count">
+            <span id="badge-count-label"></span>
+          </label>
+        </div>
+        <div class="section-actions">
+          <button class="button button-primary" id="save-settings-button" type="button"></button>
+        </div>
+      </section>
+
+      <section class="panel split-panel">
+        <div>
+          <div class="section-head">
+            <h2 id="export-title"></h2>
+            <p id="export-desc"></p>
+          </div>
+          <button class="button button-secondary" id="export-button" type="button"></button>
+        </div>
+        <div>
+          <div class="section-head">
+            <h2 id="import-title"></h2>
+            <p id="import-desc"></p>
+          </div>
+          <label class="field">
+            <span id="import-mode-label"></span>
+            <select id="import-mode" class="input"></select>
+          </label>
+          <label class="field">
+            <span id="choose-file-label"></span>
+            <input id="import-file" class="input" type="file" accept="application/json">
+          </label>
+          <button class="button button-secondary" id="import-button" type="button"></button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2 id="diagnostics-title"></h2>
+          <p id="diagnostics-desc"></p>
+        </div>
+        <div class="section-actions">
+          <button class="button button-secondary" id="run-diagnostics-button" type="button"></button>
+        </div>
+        <div class="diagnostics-grid">
+          <article class="diag-card">
+            <h3 id="selector-config-title"></h3>
+            <pre id="selector-config-output" class="code-block"></pre>
+          </article>
+          <article class="diag-card">
+            <h3 id="diagnostic-result-title"></h3>
+            <div id="diagnostic-output" class="diagnostic-output"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+
+    <script src="utils.js"></script>
+    <script src="i18n.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>
