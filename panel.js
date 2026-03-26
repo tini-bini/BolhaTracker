@@ -321,9 +321,9 @@
       }
 
       case 'donate': {
-        if (DONATION_URL) chrome.runtime.sendMessage({ type: '__OPEN_TAB__', url: DONATION_URL });
-        // Fallback: open directly
-        window.open(DONATION_URL, '_blank', 'noopener,noreferrer');
+        if (DONATION_URL) {
+          window.open(DONATION_URL, '_blank', 'noopener,noreferrer');
+        }
         break;
       }
 

@@ -3,66 +3,66 @@
 
 /* ── Dark mode (default, via :host) ──────────────────── */
 :host {
-  --bg: #0c1015;
-  --panel: #101419;
-  --panel-soft: #161b22;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.12);
+  --bg: #080d09;
+  --panel: #0d1510;
+  --panel-soft: #131a14;
+  --border: rgba(117, 177, 131, 0.1);
+  --border-strong: rgba(117, 177, 131, 0.18);
   --text: #eef0f4;
-  --muted: #7e8a98;
-  --soft: #b8c3ce;
+  --muted: #7e9884;
+  --soft: #b0c8b4;
   --accent: #75b183;
   --accent-hover: #87c095;
   --accent-text: #0d1a10;
   --success: #75b183;
   --warning: #d09b5a;
   --danger: #c97070;
-  --ghost-hover: rgba(255, 255, 255, 0.06);
-  --accent-glow: rgba(117, 177, 131, 0.28);
-  --status-dropped-bg: rgba(117, 177, 131, 0.11);
-  --status-dropped-border: rgba(117, 177, 131, 0.18);
+  --ghost-hover: rgba(117, 177, 131, 0.07);
+  --accent-glow: rgba(117, 177, 131, 0.3);
+  --status-dropped-bg: rgba(117, 177, 131, 0.13);
+  --status-dropped-border: rgba(117, 177, 131, 0.22);
   --status-increased-bg: rgba(208, 155, 90, 0.11);
   --status-increased-border: rgba(208, 155, 90, 0.16);
   --status-unavailable-bg: rgba(201, 112, 112, 0.11);
   --status-unavailable-border: rgba(201, 112, 112, 0.16);
-  --status-unchanged-bg: rgba(255, 255, 255, 0.04);
-  --status-unchanged-border: rgba(255, 255, 255, 0.07);
-  --spark-bg: #0b0e12;
-  --spark-border: rgba(255, 255, 255, 0.05);
-  --skel-bg: #161b22;
-  --header-bg: #0c1015;
+  --status-unchanged-bg: rgba(255, 255, 255, 0.03);
+  --status-unchanged-border: rgba(255, 255, 255, 0.06);
+  --spark-bg: #0a1209;
+  --spark-border: rgba(117, 177, 131, 0.08);
+  --skel-bg: #131a14;
+  --header-bg: rgba(117, 177, 131, 0.08);
 }
 
 /* ── Light mode ───────────────────────────────────────── */
 :host([data-theme="light"]) {
-  --bg: #f0f5f1;
-  --panel: #ffffff;
-  --panel-soft: #e6f0e8;
-  --border: rgba(0, 0, 0, 0.09);
-  --border-strong: rgba(0, 0, 0, 0.14);
-  --text: #121d14;
-  --muted: #4c6655;
-  --soft: #2c4436;
-  --accent: #4a8c59;
-  --accent-hover: #3d7a4c;
-  --accent-text: #ffffff;
+  --bg: #ebf4ed;
+  --panel: #f7fcf8;
+  --panel-soft: #ddeee0;
+  --border: rgba(76, 140, 90, 0.14);
+  --border-strong: rgba(76, 140, 90, 0.22);
+  --text: #0e1e10;
+  --muted: #3e6647;
+  --soft: #2a4f31;
+  --accent: #75b183;
+  --accent-hover: #63a271;
+  --accent-text: #0d1a10;
   --success: #3d7a4c;
   --warning: #a85e18;
   --danger: #a03030;
-  --ghost-hover: rgba(0, 0, 0, 0.05);
-  --accent-glow: rgba(74, 140, 89, 0.22);
-  --status-dropped-bg: rgba(74, 140, 89, 0.1);
-  --status-dropped-border: rgba(74, 140, 89, 0.2);
+  --ghost-hover: rgba(117, 177, 131, 0.1);
+  --accent-glow: rgba(117, 177, 131, 0.28);
+  --status-dropped-bg: rgba(117, 177, 131, 0.15);
+  --status-dropped-border: rgba(117, 177, 131, 0.28);
   --status-increased-bg: rgba(168, 94, 24, 0.1);
   --status-increased-border: rgba(168, 94, 24, 0.18);
   --status-unavailable-bg: rgba(160, 48, 48, 0.1);
   --status-unavailable-border: rgba(160, 48, 48, 0.16);
   --status-unchanged-bg: rgba(0, 0, 0, 0.04);
   --status-unchanged-border: rgba(0, 0, 0, 0.08);
-  --spark-bg: #eaf2ec;
-  --spark-border: rgba(0, 0, 0, 0.06);
-  --skel-bg: #dce9de;
-  --header-bg: #e8f0ea;
+  --spark-bg: #ddeee0;
+  --spark-border: rgba(117, 177, 131, 0.12);
+  --skel-bg: #cce4cf;
+  --header-bg: rgba(117, 177, 131, 0.12);
 }
 
 /* ── Panel wrap (positioned in host) ─────────────────── */
@@ -77,11 +77,12 @@
   pointer-events: all;
   background: var(--panel);
   border: 1px solid var(--border);
+  border-top: 2px solid var(--accent);
   border-radius: 13px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(117, 177, 131, 0.04);
   font-family: Aptos, "Segoe UI Variable", "Segoe UI", sans-serif;
   font-size: 12px;
   color: var(--text);
@@ -368,19 +369,24 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
   border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
+  background: rgba(117, 177, 131, 0.08);
+  color: var(--accent);
+  font-size: 11px;
   cursor: pointer;
-  transition: background 80ms, color 80ms;
+  transition: background 80ms, color 80ms, border-color 80ms, box-shadow 80ms;
   font-family: inherit;
   padding: 0;
 }
-.btn-theme:hover { background: var(--ghost-hover); color: var(--text); }
+.btn-theme:hover {
+  background: var(--ghost-hover);
+  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
 
 /* ── Resize handles (all 8 sides/corners) ────────────── */
 /* Handles live inside .panel-wrap, outside .panel,

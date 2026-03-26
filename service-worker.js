@@ -111,7 +111,7 @@ async function fetchListingSnapshot(url) {
 
 async function notifyPriceDrop(item, settings) {
   const locale = settings.locale;
-  const title = getMessage("notification_title_drop", locale);
+  const title = getMessage("notificationTitleDrop", locale);
   const message = getNotificationMessage(
     item.title || "Tracked Bolha listing",
     formatCurrency(item.lastPrice, item.currency),

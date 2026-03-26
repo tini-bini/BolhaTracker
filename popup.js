@@ -230,7 +230,7 @@ function renderSummary() {
 function renderCurrentPageCard(listing, trackedItem) {
   const alreadyTracked = Boolean(trackedItem);
   const isUnavailable = listing.available === false;
-  const badgeStatus = isUnavailable ? "unavailable" : alreadyTracked ? "unchanged" : "dropped";
+  const badgeStatus = isUnavailable ? "unavailable" : "unchanged";
   const buttonDisabled = alreadyTracked || isUnavailable;
   const buttonClass = buttonDisabled ? "button-secondary" : "button-primary";
   const buttonText = isUnavailable ? t("listingUnavailable") : alreadyTracked ? t("alreadyTracked") : t("trackListing");
