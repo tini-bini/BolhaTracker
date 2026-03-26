@@ -39,6 +39,7 @@ function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   themeButton.textContent = theme === "light" ? "☾" : "☀";
   themeButton.title = theme === "light" ? "Switch to dark mode" : "Switch to light mode";
+  themeButton.textContent = theme === "light" ? "Dark" : "Light";
 }
 
 async function loadTheme() {

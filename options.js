@@ -1,5 +1,6 @@
 const {
   BOLHA_PAGE_CONFIG,
+  DEFAULT_SETTINGS,
   DONATION_URL,
   MESSAGE_TYPES
 } = globalThis.BolhaTrackerUtils;
@@ -13,7 +14,7 @@ const toast = document.getElementById("toast");
 const themeButton = document.getElementById("theme-button");
 
 const state = {
-  settings: null
+  settings: { ...DEFAULT_SETTINGS }
 };
 
 // ── Theme ──────────────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   themeButton.textContent = theme === "light" ? "☾" : "☀";
   themeButton.title = theme === "light" ? "Switch to dark mode" : "Switch to light mode";
+  themeButton.textContent = theme === "light" ? "Dark" : "Light";
 }
 
 async function loadTheme() {
@@ -125,9 +127,15 @@ function renderSettingsForm() {
 }
 
 async function loadSettings() {
-  const response = await chrome.runtime.sendMessage({
-    type: MESSAGE_TYPES.GET_SETTINGS
-  });
+  let response = null;
+
+  try {
+    response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.GET_SETTINGS
+    });
+  } catch (error) {
+    response = null;
+  }
 
   if (response && response.ok) {
     state.settings = response.settings;
