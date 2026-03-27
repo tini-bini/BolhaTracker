@@ -4,32 +4,46 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BOLHA Price Tracker</title>
-    <link rel="stylesheet" href="popup.css">
+    <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <div class="shell">
-      <header class="app-header">
-        <div class="header-copy">
-          <p class="eyebrow" id="header-byline"></p>
-          <h1 id="header-title"></h1>
-          <p class="header-subtitle" id="header-subtitle"></p>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <main class="popup-shell">
+      <header class="glass-panel app-header">
+        <div class="app-header-main">
+          <div class="brand-lockup">
+            <div class="brand-mark">
+              <img src="icons/icon48.png" alt="BOLHA Price Tracker icon">
+            </div>
+            <div class="brand-copy">
+              <p class="eyebrow" id="header-byline"></p>
+              <h1 id="header-title"></h1>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <button class="button button-icon" id="theme-button" type="button" title="Toggle theme"></button>
+            <button class="button button-secondary button-small" id="open-options-button" type="button"></button>
+            <button class="button button-secondary button-small" id="donate-button" type="button"></button>
+          </div>
         </div>
-        <div class="header-actions">
-          <span class="badge" id="header-badge"></span>
-          <button class="button button-theme" id="theme-button" type="button" title="Toggle theme"></button>
-          <button class="button button-ghost button-small" id="open-options-button" type="button"></button>
-          <button class="button button-donate button-small" id="donate-button" type="button"></button>
+
+        <div class="app-header-meta">
+          <p class="header-subtitle" id="header-subtitle"></p>
+          <span class="meta-pill" id="header-badge"></span>
         </div>
       </header>
 
-      <section class="summary-grid" id="summary-grid"></section>
+      <section class="summary-grid" id="summary-grid" aria-label="Summary"></section>
 
-      <section class="panel" id="onboarding-panel" hidden></section>
-      <section class="panel" id="guide-panel"></section>
+      <section class="glass-panel onboarding-panel" id="onboarding-panel" hidden></section>
 
-      <section class="panel panel-accent">
-        <div class="panel-heading">
+      <section class="glass-panel spotlight-panel">
+        <div class="section-heading">
           <div>
+            <p class="section-kicker" id="current-page-kicker"></p>
             <h2 id="current-page-title"></h2>
             <p id="current-page-subtitle"></p>
           </div>
@@ -37,9 +51,70 @@
         <div id="current-page-content"></div>
       </section>
 
-      <section class="panel">
-        <div class="panel-heading">
+      <section class="glass-panel controls-panel">
+        <div class="section-heading">
           <div>
+            <p class="section-kicker" id="quick-settings-kicker"></p>
+            <h2 id="quick-settings-title"></h2>
+            <p id="quick-settings-subtitle"></p>
+          </div>
+        </div>
+
+        <div class="controls-grid">
+          <label class="field">
+            <span class="field-label" id="refresh-frequency-label"></span>
+            <select id="quick-refresh-frequency" class="input"></select>
+          </label>
+
+          <label class="field">
+            <span class="field-label" id="language-label"></span>
+            <select id="quick-language" class="input"></select>
+          </label>
+        </div>
+
+        <div class="toggle-stack">
+          <label class="toggle-row">
+            <span class="toggle-copy">
+              <span class="toggle-title" id="scheduled-refresh-label"></span>
+            </span>
+            <span class="toggle-control">
+              <input type="checkbox" id="scheduled-refresh">
+              <span class="toggle-track"></span>
+            </span>
+          </label>
+
+          <label class="toggle-row">
+            <span class="toggle-copy">
+              <span class="toggle-title" id="notifications-label"></span>
+            </span>
+            <span class="toggle-control">
+              <input type="checkbox" id="notifications-enabled">
+              <span class="toggle-track"></span>
+            </span>
+          </label>
+
+          <label class="toggle-row">
+            <span class="toggle-copy">
+              <span class="toggle-title" id="badge-count-label"></span>
+            </span>
+            <span class="toggle-control">
+              <input type="checkbox" id="badge-count">
+              <span class="toggle-track"></span>
+            </span>
+          </label>
+        </div>
+
+        <div class="button-row controls-actions">
+          <button class="button button-primary" id="save-settings-button" type="button"></button>
+        </div>
+      </section>
+
+      <section class="glass-panel guide-panel" id="guide-panel"></section>
+
+      <section class="glass-panel listings-panel">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker" id="tracked-listings-kicker"></p>
             <h2 id="tracked-listings-title"></h2>
             <p id="tracked-listings-subtitle"></p>
           </div>
@@ -50,12 +125,12 @@
       <footer class="footer">
         <p id="footer-copy"></p>
       </footer>
-    </div>
+    </main>
 
     <div id="toast" class="toast" aria-live="polite"></div>
 
     <script src="utils.js"></script>
     <script src="i18n.js"></script>
-    <script src="popup.js"></script>
+    <script src="script.js"></script>
   </body>
 </html>
