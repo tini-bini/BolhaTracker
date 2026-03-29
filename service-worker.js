@@ -11,6 +11,7 @@ const {
   formatCurrency,
   getListingId,
   getSettings,
+  getPriceAnalytics,
   getTrackedListings,
   getUnseenDropCount,
   markDropNotificationSent,
@@ -32,6 +33,12 @@ const {
   getMessage,
   getNotificationMessage
 } = globalThis.BolhaTrackerI18n;
+
+const FETCH_TIMEOUT_MS = 15000;
+const MAX_PARALLEL_REFRESHES = 3;
+const SYNC_BACKUP_META_KEY = "cloudBackupMeta";
+const SYNC_BACKUP_CHUNK_PREFIX = "cloudBackupChunk_";
+const SYNC_BACKUP_CHUNK_SIZE = 7000;
 
 async function updateBadge(items, settings) {
   if (!settings.badgeCountEnabled) {
@@ -69,13 +76,28 @@ async function bootstrapBackgroundState() {
 }
 
 async function fetchListingSnapshot(url) {
-  const response = await fetch(url, {
-    method: "GET",
-    cache: "no-store",
-    headers: {
-      Accept: "text/html,application/xhtml+xml"
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let response;
+
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        Accept: "text/html,application/xhtml+xml"
+      }
+    });
+  } catch (error) {
+    if (error && error.name === "AbortError") {
+      throw new Error("Refresh timed out while loading the latest listing.");
     }
-  });
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (response.status === 404 || response.status === 410) {
     return {
@@ -128,6 +150,186 @@ async function notifyPriceDrop(item, settings) {
   });
 }
 
+function getSellerAlertReason(previousItem, nextItem) {
+  if (!previousItem || !nextItem || !previousItem.sellerAlertEnabled || nextItem.lastError) {
+    return null;
+  }
+
+  if (previousItem.sellerName && nextItem.sellerName && previousItem.sellerName !== nextItem.sellerName) {
+    return "sellerChanged";
+  }
+
+  if (previousItem.status !== nextItem.status && nextItem.status === "unavailable") {
+    return "unavailable";
+  }
+
+  if (nextItem.status === "dropped" && previousItem.currentPrice != null && nextItem.currentPrice != null && nextItem.currentPrice < previousItem.currentPrice) {
+    return "drop";
+  }
+
+  return null;
+}
+
+async function notifySellerAlert(item, previousItem, reason, settings) {
+  const locale = settings.locale;
+  const sellerName = item.sellerName || previousItem.sellerName || getMessage("sellerUnknown", locale);
+  let message = getMessage("notificationSellerChanged", locale, [sellerName, item.title || "Tracked listing"]);
+
+  if (reason === "drop") {
+    message = getMessage(
+      "notificationSellerDrop",
+      locale,
+      [
+        sellerName,
+        item.title || "Tracked listing",
+        formatCurrency(item.currentPrice, item.currency)
+      ]
+    );
+  }
+
+  if (reason === "unavailable") {
+    message = getMessage("notificationSellerUnavailable", locale, [sellerName, item.title || "Tracked listing"]);
+  }
+
+  await chrome.notifications.create(`seller-alert-${item.id}-${Date.now()}`, {
+    type: "basic",
+    iconUrl: "icons/icon128.png",
+    title: getMessage("notificationTitleSeller", locale),
+    message,
+    priority: 1
+  });
+}
+
+function chunkText(text, size = SYNC_BACKUP_CHUNK_SIZE) {
+  const chunks = [];
+
+  for (let index = 0; index < text.length; index += size) {
+    chunks.push(text.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+async function getSyncBackupStatus() {
+  const stored = await chrome.storage.sync.get(SYNC_BACKUP_META_KEY);
+  return stored[SYNC_BACKUP_META_KEY] || null;
+}
+
+async function createSyncBackup() {
+  const settings = await getSettings();
+  const items = await getTrackedListings();
+  const payload = createExportPayload(items, settings);
+  const serialized = JSON.stringify(payload);
+  const byteLength = new TextEncoder().encode(serialized).length;
+
+  if (byteLength > 95000) {
+    throw new Error("Cloud backup is too large for Chrome sync storage.");
+  }
+
+  const chunks = chunkText(serialized);
+  const meta = {
+    exportedAt: Date.now(),
+    itemCount: items.length,
+    chunkCount: chunks.length,
+    byteLength
+  };
+  const syncPayload = {
+    [SYNC_BACKUP_META_KEY]: meta
+  };
+
+  chunks.forEach((chunk, index) => {
+    syncPayload[`${SYNC_BACKUP_CHUNK_PREFIX}${index}`] = chunk;
+  });
+
+  const previousMeta = await getSyncBackupStatus();
+  if (previousMeta && previousMeta.chunkCount) {
+    const oldKeys = Array.from({ length: previousMeta.chunkCount }, (_, index) => `${SYNC_BACKUP_CHUNK_PREFIX}${index}`);
+    await chrome.storage.sync.remove(oldKeys);
+  }
+
+  await chrome.storage.sync.set(syncPayload);
+
+  return {
+    ok: true,
+    meta
+  };
+}
+
+async function restoreSyncBackup() {
+  const meta = await getSyncBackupStatus();
+
+  if (!meta || !meta.chunkCount) {
+    throw new Error("No cloud backup found in Chrome sync.");
+  }
+
+  const keys = Array.from({ length: meta.chunkCount }, (_, index) => `${SYNC_BACKUP_CHUNK_PREFIX}${index}`);
+  const storedChunks = await chrome.storage.sync.get(keys);
+  const serialized = keys.map((key) => storedChunks[key] || "").join("");
+
+  if (!serialized) {
+    throw new Error("Cloud backup data is incomplete.");
+  }
+
+  const imported = normalizeImportPayload(JSON.parse(serialized));
+  const nextSettings = imported.settings || await getSettings();
+  const nextItems = imported.items;
+
+  await saveTrackedListings(nextItems);
+  await saveSettings(nextSettings);
+  await scheduleRefreshAlarm(nextSettings);
+  await updateBadge(nextItems, nextSettings);
+
+  return {
+    ok: true,
+    settings: nextSettings,
+    items: nextItems,
+    meta
+  };
+}
+
+async function performTrackedRefresh(currentItem, settings) {
+  let nextItem;
+
+  try {
+    const latestListing = await fetchListingSnapshot(currentItem.url);
+    const merged = mergeTrackedListing(currentItem, latestListing);
+    nextItem = applyScheduledMetadata(currentItem, merged, settings);
+  } catch (error) {
+    nextItem = createRefreshFailureItem(currentItem, error, settings);
+  }
+
+  const shouldNotify = shouldNotifyPriceDrop(currentItem, nextItem, settings);
+  const sellerAlertReason = getSellerAlertReason(currentItem, nextItem);
+  return {
+    previousItem: currentItem,
+    item: shouldNotify ? markDropNotificationSent(nextItem) : nextItem,
+    shouldNotify,
+    sellerAlertReason
+  };
+}
+
+async function runWithConcurrency(items, worker, limit = MAX_PARALLEL_REFRESHES) {
+  const queue = Array.isArray(items) ? items.slice() : [];
+  const concurrency = Math.max(1, Math.min(limit, queue.length || 1));
+  const results = [];
+
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (queue.length) {
+        const currentItem = queue.shift();
+
+        if (!currentItem) {
+          return;
+        }
+
+        results.push(await worker(currentItem));
+      }
+    })
+  );
+
+  return results;
+}
+
 async function addTrackedListing(payload) {
   const existing = await findTrackedListingByUrl(payload.url);
 
@@ -162,18 +364,7 @@ async function refreshTrackedListing(id) {
     throw new Error("Tracked listing not found.");
   }
 
-  let nextItem;
-
-  try {
-    const latestListing = await fetchListingSnapshot(currentItem.url);
-    const merged = mergeTrackedListing(currentItem, latestListing);
-    nextItem = applyScheduledMetadata(currentItem, merged, settings);
-  } catch (error) {
-    nextItem = createRefreshFailureItem(currentItem, error, settings);
-  }
-
-  const shouldNotify = shouldNotifyPriceDrop(currentItem, nextItem, settings);
-  const finalItem = shouldNotify ? markDropNotificationSent(nextItem) : nextItem;
+  const { item: finalItem, shouldNotify, sellerAlertReason } = await performTrackedRefresh(currentItem, settings);
   const nextItems = items.map((item) => (item.id === id ? normalizeStoredListing(finalItem) : item));
 
   await saveTrackedListings(nextItems);
@@ -181,6 +372,10 @@ async function refreshTrackedListing(id) {
 
   if (shouldNotify) {
     await notifyPriceDrop(finalItem, settings);
+  }
+
+  if (sellerAlertReason) {
+    await notifySellerAlert(finalItem, currentItem, sellerAlertReason, settings);
   }
 
   return {
@@ -204,14 +399,22 @@ async function refreshDueListings() {
     };
   }
 
-  let nextItems = items.slice();
+  const refreshResults = await runWithConcurrency(dueItems, (item) => performTrackedRefresh(item, settings));
+  const refreshedById = new Map(refreshResults.map((result) => [result.item.id, normalizeStoredListing(result.item)]));
+  const nextItems = items.map((item) => refreshedById.get(item.id) || item);
 
-  for (const item of dueItems) {
-    const response = await refreshTrackedListing(item.id);
-    nextItems = nextItems.map((entry) => (entry.id === item.id ? normalizeStoredListing(response.item) : entry));
-  }
-
+  await saveTrackedListings(nextItems);
   await updateBadge(nextItems, settings);
+  await Promise.all(
+    refreshResults
+      .filter((result) => result.shouldNotify)
+      .map((result) => notifyPriceDrop(result.item, settings))
+  );
+  await Promise.all(
+    refreshResults
+      .filter((result) => result.sellerAlertReason)
+      .map((result) => notifySellerAlert(result.item, result.previousItem, result.sellerAlertReason, settings))
+  );
 
   return {
     ok: true,
@@ -230,7 +433,10 @@ async function updateTrackedListingMeta(payload) {
     return normalizeStoredListing({
       ...item,
       notes: payload.notes || "",
-      tags: normalizeTags(payload.tags)
+      tags: normalizeTags(payload.tags),
+      sellerAlertEnabled: payload && Object.prototype.hasOwnProperty.call(payload, "sellerAlertEnabled")
+        ? Boolean(payload.sellerAlertEnabled)
+        : item.sellerAlertEnabled
     });
   });
 
@@ -341,6 +547,13 @@ async function handleImportData(payload) {
   };
 }
 
+async function handleGetSyncBackupStatus() {
+  return {
+    ok: true,
+    meta: await getSyncBackupStatus()
+  };
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   bootstrapBackgroundState();
 });
@@ -352,6 +565,12 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm && alarm.name === ALARM_NAME) {
     refreshDueListings();
+  }
+});
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "refresh_due_listings") {
+    refreshDueListings().catch(() => {});
   }
 });
 
@@ -399,6 +618,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (message.type === MESSAGE_TYPES.REFRESH_DUE_LISTINGS) {
       return refreshDueListings();
+    }
+
+    if (message.type === MESSAGE_TYPES.CREATE_SYNC_BACKUP) {
+      return createSyncBackup();
+    }
+
+    if (message.type === MESSAGE_TYPES.RESTORE_SYNC_BACKUP) {
+      return restoreSyncBackup();
+    }
+
+    if (message.type === MESSAGE_TYPES.GET_SYNC_BACKUP_STATUS) {
+      return handleGetSyncBackupStatus();
     }
 
     return {

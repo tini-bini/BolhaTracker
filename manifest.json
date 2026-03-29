@@ -2,8 +2,9 @@
   "manifest_version": 3,
   "name": "BOLHA Price Tracker",
   "short_name": "Bolha Tracker",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Track Bolha.com listing prices locally and get notified when they drop.",
+  "minimum_chrome_version": "114",
   "permissions": [
     "storage",
     "notifications",
@@ -24,6 +25,21 @@
       "32": "icons/icon32.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
+    }
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+B",
+        "mac": "Command+Shift+B"
+      }
+    },
+    "refresh_due_listings": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Refresh due tracked listings"
     }
   },
   "options_page": "options.html",

@@ -40,8 +40,11 @@
     loading: true,
     minimized: false,
     refreshing: false,
-    closed: false
+    closed: false,
+    notice: ''
   };
+
+  let noticeTimer = null;
 
   function applyTheme(theme) {
     state.theme = theme || 'dark';
@@ -58,6 +61,24 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function showNotice(message) {
+    state.notice = message || '';
+    render();
+    rebindDrag();
+
+    if (noticeTimer) {
+      clearTimeout(noticeTimer);
+    }
+
+    if (!message) return;
+
+    noticeTimer = setTimeout(() => {
+      state.notice = '';
+      render();
+      rebindDrag();
+    }, 2200);
   }
 
   // ── Saved position/size ────────────────────────────────────────────────────
@@ -259,7 +280,7 @@
             <span class="p-brand">Bolha Tracker</span>
           </div>
           <div class="p-header-right">
-            <button class="btn btn-donate" data-action="donate" title="Support development">Donate</button>
+            <button class="btn btn-donate" data-action="donate" title="Support development" ${DONATION_URL ? "" : "disabled"}>Donate</button>
             <button class="btn-theme p-hbtn" data-action="theme" title="${esc(themeTitle)}">${esc(themeIcon)}</button>
             <button class="p-hbtn" data-action="minimize" title="${minimized ? 'Expand' : 'Minimize'}">${minimizeIcon}</button>
             <button class="p-hbtn" data-action="close" title="Close">×</button>

@@ -25,6 +25,27 @@
       <section class="panel split-panel">
         <div>
           <div class="section-head">
+            <h2 id="overview-title"></h2>
+            <p id="overview-subtitle"></p>
+          </div>
+          <div class="overview-grid" id="overview-grid"></div>
+        </div>
+        <div>
+          <div class="section-head">
+            <h2 id="actions-title"></h2>
+            <p id="actions-subtitle"></p>
+          </div>
+          <div class="action-stack">
+            <button class="button button-primary" id="refresh-due-button" type="button"></button>
+            <button class="button button-secondary" id="reset-onboarding-button" type="button"></button>
+          </div>
+          <div class="shortcut-card" id="shortcut-card"></div>
+        </div>
+      </section>
+
+      <section class="panel split-panel">
+        <div>
+          <div class="section-head">
             <h2 id="guide-title"></h2>
           </div>
           <div class="diagnostic-output" id="guide-output"></div>
@@ -85,6 +106,27 @@
       <section class="panel split-panel">
         <div>
           <div class="section-head">
+            <h2 id="cloud-title"></h2>
+            <p id="cloud-subtitle"></p>
+          </div>
+          <div class="shortcut-card" id="cloud-status"></div>
+          <div class="action-stack">
+            <button class="button button-primary" id="cloud-backup-button" type="button"></button>
+            <button class="button button-secondary" id="cloud-restore-button" type="button"></button>
+          </div>
+        </div>
+        <div>
+          <div class="section-head">
+            <h2 id="presets-title"></h2>
+            <p id="presets-subtitle"></p>
+          </div>
+          <div class="preset-list" id="preset-list"></div>
+        </div>
+      </section>
+
+      <section class="panel split-panel">
+        <div>
+          <div class="section-head">
             <h2 id="export-title"></h2>
             <p id="export-desc"></p>
           </div>
@@ -123,6 +165,27 @@
           <article class="diag-card">
             <h3 id="diagnostic-result-title"></h3>
             <div id="diagnostic-output" class="diagnostic-output"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2 id="analytics-title"></h2>
+          <p id="analytics-subtitle"></p>
+        </div>
+        <label class="field">
+          <span id="analytics-select-label"></span>
+          <select id="analytics-listing" class="input"></select>
+        </label>
+        <div class="analytics-grid">
+          <article class="diag-card">
+            <h3 id="analytics-chart-title"></h3>
+            <div id="analytics-chart" class="analytics-chart"></div>
+          </article>
+          <article class="diag-card">
+            <h3 id="analytics-metrics-title"></h3>
+            <div id="analytics-metrics" class="diagnostic-output"></div>
           </article>
         </div>
       </section>

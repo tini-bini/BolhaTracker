@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BOLHA Price Tracker</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <div class="ambient ambient-one" aria-hidden="true"></div>
@@ -39,6 +39,40 @@
       <section class="summary-grid" id="summary-grid" aria-label="Summary"></section>
 
       <section class="glass-panel onboarding-panel" id="onboarding-panel" hidden></section>
+
+      <section class="glass-panel command-panel">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker" id="watchlist-tools-kicker"></p>
+            <h2 id="watchlist-tools-title"></h2>
+            <p id="watchlist-tools-subtitle"></p>
+          </div>
+        </div>
+
+        <div class="command-grid">
+          <label class="field field-search">
+            <span class="field-label" id="watchlist-search-label"></span>
+            <input id="watchlist-search" class="input" type="search" autocomplete="off">
+          </label>
+
+          <label class="field">
+            <span class="field-label" id="watchlist-sort-label"></span>
+            <select id="watchlist-sort" class="input"></select>
+          </label>
+        </div>
+
+        <div class="filter-strip" id="watchlist-filter-strip" role="tablist" aria-label="Watchlist filters"></div>
+
+        <div class="preset-row">
+          <div id="watchlist-presets" class="preset-strip"></div>
+          <button class="button button-secondary button-small" id="save-view-button" type="button"></button>
+        </div>
+
+        <div class="button-row command-actions">
+          <button class="button button-secondary" id="refresh-due-button" type="button"></button>
+          <a class="button button-secondary" id="open-bolha-button" href="https://www.bolha.com/" target="_blank" rel="noreferrer"></a>
+        </div>
+      </section>
 
       <section class="glass-panel spotlight-panel">
         <div class="section-heading">
@@ -131,6 +165,6 @@
 
     <script src="utils.js"></script>
     <script src="i18n.js"></script>
-    <script src="script.js"></script>
+    <script src="popup.js"></script>
   </body>
 </html>

@@ -1,0 +1,7 @@
+.tools/
+dist/
+release/
+__pycache__/
+*.pyc
+*.zip
+.tmp-tsconfig.json

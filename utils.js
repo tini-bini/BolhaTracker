@@ -4,8 +4,9 @@
   const EXPORT_VERSION = 2;
   const HISTORY_LIMIT = 24;
   const MAX_TAGS = 8;
+  const MAX_SAVED_VIEWS = 6;
   const ALARM_NAME = "scheduled-refresh";
-  const DONATION_URL = "https://paypal.me/TiniFlegar";
+  const DONATION_URLS = ["https://paypal.me/TiniFlegar"];
 
   const STATUS = {
     UNCHANGED: "unchanged",
@@ -25,7 +26,10 @@
     MARK_DROPS_SEEN: "MARK_DROPS_SEEN",
     EXPORT_TRACKED_DATA: "EXPORT_TRACKED_DATA",
     IMPORT_TRACKED_DATA: "IMPORT_TRACKED_DATA",
-    REFRESH_DUE_LISTINGS: "REFRESH_DUE_LISTINGS"
+    REFRESH_DUE_LISTINGS: "REFRESH_DUE_LISTINGS",
+    CREATE_SYNC_BACKUP: "CREATE_SYNC_BACKUP",
+    RESTORE_SYNC_BACKUP: "RESTORE_SYNC_BACKUP",
+    GET_SYNC_BACKUP_STATUS: "GET_SYNC_BACKUP_STATUS"
   };
 
   const DEFAULT_SETTINGS = {
@@ -34,8 +38,10 @@
     notificationsEnabled: true,
     badgeCountEnabled: true,
     locale: "auto",
-    onboardingCompleted: false
+    onboardingCompleted: false,
+    savedViews: []
   };
+  const REFRESH_INTERVALS = [30, 60, 180, 360, 720, 1440];
 
   const STATUS_META = {
     [STATUS.UNCHANGED]: { tone: "unchanged" },
@@ -229,6 +235,69 @@
     } catch (error) {
       return `${amount} ${currency || "EUR"}`;
     }
+  }
+
+  function isValidPayPalMeLink(rawUrl) {
+    if (!rawUrl) {
+      return false;
+    }
+
+    try {
+      const url = new URL(String(rawUrl).trim());
+      const hostname = url.hostname.toLowerCase();
+
+      if (url.protocol !== "https:") {
+        return false;
+      }
+
+      if (!["paypal.me", "www.paypal.me"].includes(hostname)) {
+        return false;
+      }
+
+      const segments = url.pathname.split("/").filter(Boolean);
+
+      if (segments.length < 1 || segments.length > 2) {
+        return false;
+      }
+
+      if (!/^[a-z0-9._-]{2,20}$/i.test(segments[0])) {
+        return false;
+      }
+
+      if (segments[1] && !/^\d+(?:[.,]\d{1,2})?(?:[A-Z]{3})?$/i.test(segments[1])) {
+        return false;
+      }
+
+      return !url.search && !url.hash;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function buildPayPalMeLink(baseUrl, amount, currencyCode) {
+    if (!isValidPayPalMeLink(baseUrl)) {
+      return null;
+    }
+
+    if (amount == null || amount === "") {
+      return normalizeUrl(baseUrl);
+    }
+
+    const normalizedAmount = Number(amount);
+
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      return null;
+    }
+
+    const parsed = new URL(baseUrl);
+    const amountPart = normalizedAmount % 1 === 0 ? String(normalizedAmount) : normalizedAmount.toFixed(2);
+    const currencyPart = currencyCode && /^[A-Z]{3}$/i.test(currencyCode) ? currencyCode.toUpperCase() : "";
+    parsed.pathname = `${parsed.pathname.replace(/\/+$/, "")}/${amountPart}${currencyPart}`;
+    return parsed.toString();
+  }
+
+  function getPreferredDonationLink() {
+    return DONATION_URLS.find(isValidPayPalMeLink) || null;
   }
 
   function formatDateTime(timestamp, locale) {
@@ -500,16 +569,16 @@
       ...DEFAULT_SETTINGS,
       ...(rawSettings || {})
     };
-    const allowedIntervals = [30, 60, 180, 360, 720, 1440];
     const interval = Number(merged.refreshIntervalMinutes);
 
     return {
       scheduledRefreshEnabled: Boolean(merged.scheduledRefreshEnabled),
-      refreshIntervalMinutes: allowedIntervals.includes(interval) ? interval : DEFAULT_SETTINGS.refreshIntervalMinutes,
+      refreshIntervalMinutes: REFRESH_INTERVALS.includes(interval) ? interval : DEFAULT_SETTINGS.refreshIntervalMinutes,
       notificationsEnabled: merged.notificationsEnabled !== false,
       badgeCountEnabled: merged.badgeCountEnabled !== false,
       locale: ["auto", "en", "sl"].includes(merged.locale) ? merged.locale : DEFAULT_SETTINGS.locale,
-      onboardingCompleted: Boolean(merged.onboardingCompleted)
+      onboardingCompleted: Boolean(merged.onboardingCompleted),
+      savedViews: normalizeSavedViews(merged.savedViews)
     };
   }
 
@@ -538,6 +607,34 @@
       .filter(Boolean)
       .filter((value, index, array) => array.indexOf(value) === index)
       .slice(0, MAX_TAGS);
+  }
+
+  function normalizeSavedViews(rawViews) {
+    const validFilters = ["all", "drops", "due", "unavailable", "notes"];
+    const validSorts = ["recent", "lastChecked", "biggestDrop", "priceLow", "title", "oldest"];
+
+    return (Array.isArray(rawViews) ? rawViews : [])
+      .map((view) => {
+        const name = cleanText(view && view.name).slice(0, 32);
+        const query = cleanText(view && view.query).slice(0, 80);
+        const filter = validFilters.includes(view && view.filter) ? view.filter : "all";
+        const sort = validSorts.includes(view && view.sort) ? view.sort : "recent";
+
+        if (!name) {
+          return null;
+        }
+
+        return {
+          id: cleanText(view && view.id) || `view_${hashString(`${name}:${query}:${filter}:${sort}`)}`,
+          name,
+          query,
+          filter,
+          sort
+        };
+      })
+      .filter(Boolean)
+      .filter((view, index, array) => array.findIndex((entry) => entry.id === view.id) === index)
+      .slice(0, MAX_SAVED_VIEWS);
   }
 
   function normalizeExtractedListing(rawListing) {
@@ -777,6 +874,7 @@
       lastViewedDropAt: Number(rawItem && rawItem.lastViewedDropAt) || null,
       notes: cleanText(rawItem && rawItem.notes),
       tags: normalizeTags(rawItem && rawItem.tags),
+      sellerAlertEnabled: Boolean(rawItem && rawItem.sellerAlertEnabled),
       nextCheckAt: Number(rawItem && rawItem.nextCheckAt) || null,
       priceHistory: normalizePriceHistory(rawItem && rawItem.priceHistory),
       consecutiveUnavailableCount: Number(rawItem && rawItem.consecutiveUnavailableCount) || 0,
@@ -817,6 +915,7 @@
       lastViewedDropAt: null,
       notes: "",
       tags: [],
+      sellerAlertEnabled: false,
       nextCheckAt: normalizedSettings.scheduledRefreshEnabled
         ? now + normalizedSettings.refreshIntervalMinutes * 60000
         : null,
@@ -1020,6 +1119,40 @@
       .map((entry) => entry.price);
   }
 
+  function getPriceAnalytics(item) {
+    const history = normalizePriceHistory(item && item.priceHistory)
+      .filter((entry) => entry.available !== false && entry.price != null);
+    const prices = history.map((entry) => entry.price);
+
+    if (!prices.length) {
+      return {
+        sampleCount: 0,
+        low: null,
+        high: null,
+        average: null,
+        firstPrice: null,
+        lastPrice: null,
+        delta: null,
+        percentChange: null
+      };
+    }
+
+    const firstPrice = prices[0];
+    const lastPrice = prices[prices.length - 1];
+    const delta = lastPrice - firstPrice;
+
+    return {
+      sampleCount: prices.length,
+      low: Math.min(...prices),
+      high: Math.max(...prices),
+      average: prices.reduce((sum, price) => sum + price, 0) / prices.length,
+      firstPrice,
+      lastPrice,
+      delta,
+      percentChange: firstPrice ? (delta / firstPrice) * 100 : null
+    };
+  }
+
   function buildSparklinePath(points, width, height) {
     if (!Array.isArray(points) || points.length < 2) {
       return "";
@@ -1106,6 +1239,116 @@
     return Array.from(map.values()).sort((first, second) => second.dateTracked - first.dateTracked);
   }
 
+  function getTrackedListingStats(items, now = Date.now()) {
+    const normalizedItems = Array.isArray(items) ? items.map(normalizeStoredListing) : [];
+    const nextCheckValues = normalizedItems
+      .map((item) => item.nextCheckAt)
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const lastCheckedValues = normalizedItems
+      .map((item) => item.lastChecked)
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+    return {
+      total: normalizedItems.length,
+      unseenDrops: normalizedItems.filter((item) => item.hasUnseenDrop).length,
+      unavailable: normalizedItems.filter((item) => item.available === false).length,
+      due: normalizedItems.filter((item) => item.nextCheckAt == null || item.nextCheckAt <= now).length,
+      withNotes: normalizedItems.filter((item) => item.notes).length,
+      withTags: normalizedItems.filter((item) => Array.isArray(item.tags) && item.tags.length).length,
+      nextCheckAt: nextCheckValues.length ? Math.min(...nextCheckValues) : null,
+      lastCheckedAt: lastCheckedValues.length ? Math.max(...lastCheckedValues) : null
+    };
+  }
+
+  function matchesTrackedListingQuery(item, query) {
+    const normalized = normalizeStoredListing(item);
+    const search = cleanText(query).toLowerCase();
+
+    if (!search) {
+      return true;
+    }
+
+    const haystack = [
+      normalized.title,
+      normalized.sellerName,
+      normalized.categoryLabel,
+      normalized.url,
+      normalized.notes,
+      ...(Array.isArray(normalized.tags) ? normalized.tags : [])
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(search);
+  }
+
+  function filterTrackedListings(items, options = {}) {
+    const normalizedItems = Array.isArray(items) ? items.map(normalizeStoredListing) : [];
+    const query = options.query || "";
+    const filter = options.filter || "all";
+    const now = Number(options.now) || Date.now();
+
+    return normalizedItems.filter((item) => {
+      if (!matchesTrackedListingQuery(item, query)) {
+        return false;
+      }
+
+      if (filter === "drops") {
+        return item.hasUnseenDrop || item.status === STATUS.DROPPED;
+      }
+
+      if (filter === "unavailable") {
+        return item.available === false;
+      }
+
+      if (filter === "due") {
+        return item.nextCheckAt == null || item.nextCheckAt <= now;
+      }
+
+      if (filter === "notes") {
+        return Boolean(item.notes || (item.tags && item.tags.length));
+      }
+
+      return true;
+    });
+  }
+
+  function sortTrackedListings(items, sortKey = "recent") {
+    const normalizedItems = Array.isArray(items) ? items.map(normalizeStoredListing) : [];
+    const sorted = normalizedItems.slice();
+
+    sorted.sort((first, second) => {
+      if (sortKey === "title") {
+        return first.title.localeCompare(second.title);
+      }
+
+      if (sortKey === "lastChecked") {
+        return (second.lastChecked || 0) - (first.lastChecked || 0);
+      }
+
+      if (sortKey === "priceLow") {
+        const firstPrice = first.currentPrice == null ? Number.POSITIVE_INFINITY : first.currentPrice;
+        const secondPrice = second.currentPrice == null ? Number.POSITIVE_INFINITY : second.currentPrice;
+        return firstPrice - secondPrice || second.dateTracked - first.dateTracked;
+      }
+
+      if (sortKey === "biggestDrop") {
+        const firstDelta = first.lastPrice != null && first.currentPrice != null ? first.lastPrice - first.currentPrice : Number.NEGATIVE_INFINITY;
+        const secondDelta = second.lastPrice != null && second.currentPrice != null ? second.lastPrice - second.currentPrice : Number.NEGATIVE_INFINITY;
+        return secondDelta - firstDelta || second.dateTracked - first.dateTracked;
+      }
+
+      if (sortKey === "oldest") {
+        return first.dateTracked - second.dateTracked;
+      }
+
+      return second.dateTracked - first.dateTracked;
+    });
+
+    return sorted;
+  }
+
   function getMissingDiagnosticFields(listing) {
     if (!listing) {
       return ["title", "price", "seller", "category"];
@@ -1132,16 +1375,21 @@
     return missing;
   }
 
+  const DONATION_URL = getPreferredDonationLink();
+
   global.BolhaTrackerUtils = {
     STORAGE_KEY,
     SETTINGS_KEY,
     EXPORT_VERSION,
     HISTORY_LIMIT,
+    MAX_SAVED_VIEWS,
     ALARM_NAME,
+    DONATION_URLS,
     DONATION_URL,
     STATUS,
     STATUS_META,
     DEFAULT_SETTINGS,
+    REFRESH_INTERVALS,
     BOLHA_PAGE_CONFIG,
     MESSAGE_TYPES,
     cleanText,
@@ -1153,11 +1401,15 @@
     parsePriceText,
     formatCurrency,
     formatDateTime,
+    isValidPayPalMeLink,
+    buildPayPalMeLink,
+    getPreferredDonationLink,
     getListingId,
     sanitizeSettings,
     getSettings,
     saveSettings,
     normalizeTags,
+    normalizeSavedViews,
     extractListingFromHtml,
     extractListingFromDocument,
     normalizeStoredListing,
@@ -1173,6 +1425,7 @@
     getUnseenDropCount,
     getPriceDelta,
     getPriceSeries,
+    getPriceAnalytics,
     buildSparklinePath,
     getTrackedListings,
     saveTrackedListings,
@@ -1181,6 +1434,10 @@
     createExportPayload,
     normalizeImportPayload,
     mergeImportedData,
+    getTrackedListingStats,
+    matchesTrackedListingQuery,
+    filterTrackedListings,
+    sortTrackedListings,
     getMissingDiagnosticFields
   };
 })(globalThis);
