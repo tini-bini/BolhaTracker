@@ -252,8 +252,6 @@ function populateSelects() {
     .join("");
 
   elements.languageSelect.innerHTML = [
-    { value: "auto", label: t("localeAuto") },
-    { value: "en", label: t("localeEn") },
     { value: "sl", label: t("localeSl") }
   ]
     .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)

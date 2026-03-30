@@ -52,6 +52,7 @@ def main() -> None:
     print_step("building release artifact")
     artifact = build_release_zip()
     print(f"release artifact: {artifact}")
+    print("upload this zip directly to Chrome Web Store; do not zip the repository root or dist/package.")
 
 
 if __name__ == "__main__":

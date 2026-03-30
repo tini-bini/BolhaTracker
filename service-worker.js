@@ -39,6 +39,7 @@ const MAX_PARALLEL_REFRESHES = 3;
 const SYNC_BACKUP_META_KEY = "cloudBackupMeta";
 const SYNC_BACKUP_CHUNK_PREFIX = "cloudBackupChunk_";
 const SYNC_BACKUP_CHUNK_SIZE = 7000;
+const LOCAL_SAFETY_BACKUP_KEY = "lastSafetyBackup";
 
 async function updateBadge(items, settings) {
   if (!settings.badgeCountEnabled) {
@@ -91,7 +92,7 @@ async function fetchListingSnapshot(url) {
     });
   } catch (error) {
     if (error && error.name === "AbortError") {
-      throw new Error("Refresh timed out while loading the latest listing.");
+      throw new Error("Osveževanje je poteklo med nalaganjem najnovejšega oglasa.");
     }
 
     throw error;
@@ -103,9 +104,9 @@ async function fetchListingSnapshot(url) {
     return {
       id: getListingId(url),
       url: normalizeUrl(url),
-      title: "Bolha listing",
+      title: "Bolha oglas",
       price: null,
-      priceText: "Listing unavailable",
+      priceText: "Oglas ni na voljo",
       currency: "EUR",
       imageUrl: null,
       sellerName: null,
@@ -118,14 +119,14 @@ async function fetchListingSnapshot(url) {
   }
 
   if (!response.ok) {
-    throw new Error(`Bolha returned ${response.status}.`);
+    throw new Error(`Bolha je vrnila stanje ${response.status}.`);
   }
 
   const html = await response.text();
   const listing = extractListingFromHtml(html, url);
 
   if (!listing.isDetected) {
-    throw new Error("Could not parse the latest listing data from Bolha.");
+    throw new Error("Najnovejših podatkov oglasa z Bolhe ni bilo mogoče razbrati.");
   }
 
   return listing;
@@ -135,7 +136,7 @@ async function notifyPriceDrop(item, settings) {
   const locale = settings.locale;
   const title = getMessage("notificationTitleDrop", locale);
   const message = getNotificationMessage(
-    item.title || "Tracked Bolha listing",
+    item.title || "Spremljani oglas na Bolhi",
     formatCurrency(item.lastPrice, item.currency),
     formatCurrency(item.currentPrice, item.currency),
     locale
@@ -173,7 +174,7 @@ function getSellerAlertReason(previousItem, nextItem) {
 async function notifySellerAlert(item, previousItem, reason, settings) {
   const locale = settings.locale;
   const sellerName = item.sellerName || previousItem.sellerName || getMessage("sellerUnknown", locale);
-  let message = getMessage("notificationSellerChanged", locale, [sellerName, item.title || "Tracked listing"]);
+  let message = getMessage("notificationSellerChanged", locale, [sellerName, item.title || "Spremljani oglas"]);
 
   if (reason === "drop") {
     message = getMessage(
@@ -181,14 +182,14 @@ async function notifySellerAlert(item, previousItem, reason, settings) {
       locale,
       [
         sellerName,
-        item.title || "Tracked listing",
+        item.title || "Spremljani oglas",
         formatCurrency(item.currentPrice, item.currency)
       ]
     );
   }
 
   if (reason === "unavailable") {
-    message = getMessage("notificationSellerUnavailable", locale, [sellerName, item.title || "Tracked listing"]);
+    message = getMessage("notificationSellerUnavailable", locale, [sellerName, item.title || "Spremljani oglas"]);
   }
 
   await chrome.notifications.create(`seller-alert-${item.id}-${Date.now()}`, {
@@ -215,6 +216,21 @@ async function getSyncBackupStatus() {
   return stored[SYNC_BACKUP_META_KEY] || null;
 }
 
+async function createSafetyBackupSnapshot(reason) {
+  const settings = await getSettings();
+  const items = await getTrackedListings();
+  const snapshot = {
+    ...createExportPayload(items, settings),
+    backupReason: reason || "manual"
+  };
+
+  await chrome.storage.local.set({
+    [LOCAL_SAFETY_BACKUP_KEY]: snapshot
+  });
+
+  return snapshot;
+}
+
 async function createSyncBackup() {
   const settings = await getSettings();
   const items = await getTrackedListings();
@@ -223,7 +239,7 @@ async function createSyncBackup() {
   const byteLength = new TextEncoder().encode(serialized).length;
 
   if (byteLength > 95000) {
-    throw new Error("Cloud backup is too large for Chrome sync storage.");
+    throw new Error("Varnostna kopija je prevelika za shrambo Chrome Sync.");
   }
 
   const chunks = chunkText(serialized);
@@ -236,18 +252,21 @@ async function createSyncBackup() {
   const syncPayload = {
     [SYNC_BACKUP_META_KEY]: meta
   };
+  const previousMeta = await getSyncBackupStatus();
 
   chunks.forEach((chunk, index) => {
     syncPayload[`${SYNC_BACKUP_CHUNK_PREFIX}${index}`] = chunk;
   });
 
-  const previousMeta = await getSyncBackupStatus();
-  if (previousMeta && previousMeta.chunkCount) {
-    const oldKeys = Array.from({ length: previousMeta.chunkCount }, (_, index) => `${SYNC_BACKUP_CHUNK_PREFIX}${index}`);
-    await chrome.storage.sync.remove(oldKeys);
-  }
-
   await chrome.storage.sync.set(syncPayload);
+
+  if (previousMeta && previousMeta.chunkCount > chunks.length) {
+    const staleKeys = Array.from(
+      { length: previousMeta.chunkCount - chunks.length },
+      (_, index) => `${SYNC_BACKUP_CHUNK_PREFIX}${chunks.length + index}`
+    );
+    await chrome.storage.sync.remove(staleKeys);
+  }
 
   return {
     ok: true,
@@ -259,7 +278,7 @@ async function restoreSyncBackup() {
   const meta = await getSyncBackupStatus();
 
   if (!meta || !meta.chunkCount) {
-    throw new Error("No cloud backup found in Chrome sync.");
+    throw new Error("V Chrome Sync ni najdene varnostne kopije.");
   }
 
   const keys = Array.from({ length: meta.chunkCount }, (_, index) => `${SYNC_BACKUP_CHUNK_PREFIX}${index}`);
@@ -267,13 +286,14 @@ async function restoreSyncBackup() {
   const serialized = keys.map((key) => storedChunks[key] || "").join("");
 
   if (!serialized) {
-    throw new Error("Cloud backup data is incomplete.");
+    throw new Error("Podatki varnostne kopije v oblaku niso popolni.");
   }
 
   const imported = normalizeImportPayload(JSON.parse(serialized));
   const nextSettings = imported.settings || await getSettings();
   const nextItems = imported.items;
 
+  await createSafetyBackupSnapshot("before_sync_restore");
   await saveTrackedListings(nextItems);
   await saveSettings(nextSettings);
   await scheduleRefreshAlarm(nextSettings);
@@ -361,7 +381,7 @@ async function refreshTrackedListing(id) {
   const currentItem = items.find((item) => item.id === id);
 
   if (!currentItem) {
-    throw new Error("Tracked listing not found.");
+    throw new Error("Spremljanega oglasa ni bilo mogoče najti.");
   }
 
   const { item: finalItem, shouldNotify, sellerAlertReason } = await performTrackedRefresh(currentItem, settings);
@@ -534,6 +554,10 @@ async function handleImportData(payload) {
         ...(imported.settings || {})
       };
 
+  if (mode === "replace") {
+    await createSafetyBackupSnapshot("before_import_replace");
+  }
+
   await saveTrackedListings(nextItems);
   await saveSettings(nextSettings);
   await scheduleRefreshAlarm(nextSettings);
@@ -634,14 +658,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return {
       ok: false,
-      error: "Unsupported message type."
+      error: "Nepodprta vrsta sporočila."
     };
   })()
     .then((result) => sendResponse(result))
     .catch((error) =>
       sendResponse({
         ok: false,
-        error: error.message || "Something went wrong."
+        error: error.message || "Prišlo je do napake."
       })
     );
 

@@ -38,6 +38,15 @@ function t(key, substitutions) {
   return getMessage(key, locale(), substitutions);
 }
 
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function applyTheme(theme) {
   const activeTheme = theme || "light";
   document.documentElement.setAttribute("data-theme", activeTheme);
@@ -133,8 +142,6 @@ function populateSelects() {
 
   const languageSelect = document.getElementById("language");
   languageSelect.innerHTML = [
-    { value: "auto", label: t("localeAuto") },
-    { value: "en", label: t("localeEn") },
     { value: "sl", label: t("localeSl") }
   ].map((option) => `<option value="${option.value}">${option.label}</option>`).join("");
 
@@ -225,10 +232,10 @@ function renderPresetList() {
     .map((preset) => `
       <div class="preset-item">
         <div>
-          <strong>${preset.name}</strong>
-          <div>${preset.query || t("filterall")} - ${t(`filter${preset.filter}`)} - ${t(`sort${preset.sort}`)}</div>
+          <strong>${escapeHtml(preset.name)}</strong>
+          <div>${escapeHtml(preset.query || t("filterall"))} - ${escapeHtml(t(`filter${preset.filter}`))} - ${escapeHtml(t(`sort${preset.sort}`))}</div>
         </div>
-        <button class="button button-secondary button-small" data-preset-remove="${preset.id}" type="button">${t("remove")}</button>
+        <button class="button button-secondary button-small" data-preset-remove="${escapeHtml(preset.id)}" type="button">${escapeHtml(t("remove"))}</button>
       </div>
     `)
     .join("");
@@ -242,8 +249,8 @@ function renderAnalytics() {
   const currentValue = select.value;
 
   select.innerHTML = items.length
-    ? items.map((item) => `<option value="${item.id}">${item.title}</option>`).join("")
-    : `<option value="">${t("noTrackedTitle")}</option>`;
+    ? items.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)}</option>`).join("")
+    : `<option value="">${escapeHtml(t("noTrackedTitle"))}</option>`;
 
   if (currentValue) {
     select.value = currentValue;
@@ -457,19 +464,19 @@ function renderDiagnosticsResult(result) {
 
   container.innerHTML = `
     <div class="diag-list">
-      <div><strong>${t("diagTitleField")}:</strong> ${listing.title || "-"}</div>
-      <div><strong>${t("diagPriceField")}:</strong> ${listing.priceText || "-"}</div>
-      <div><strong>${t("diagSellerField")}:</strong> ${listing.sellerName || "-"}</div>
-      <div><strong>${t("diagCategoryField")}:</strong> ${listing.categoryLabel || "-"}</div>
-      <div><strong>${t("diagStatusField")}:</strong> ${listing.available === false ? getMessage("statusUnavailable", locale()) : getMessage("statusUnchanged", locale())}</div>
+      <div><strong>${escapeHtml(t("diagTitleField"))}:</strong> ${escapeHtml(listing.title || "-")}</div>
+      <div><strong>${escapeHtml(t("diagPriceField"))}:</strong> ${escapeHtml(listing.priceText || "-")}</div>
+      <div><strong>${escapeHtml(t("diagSellerField"))}:</strong> ${escapeHtml(listing.sellerName || "-")}</div>
+      <div><strong>${escapeHtml(t("diagCategoryField"))}:</strong> ${escapeHtml(listing.categoryLabel || "-")}</div>
+      <div><strong>${escapeHtml(t("diagStatusField"))}:</strong> ${escapeHtml(listing.available === false ? getMessage("statusUnavailable", locale()) : getMessage("statusUnchanged", locale()))}</div>
     </div>
     <div class="diag-list">
-      <strong>${t("diagnosticsHints")}:</strong>
-      <div>${(listing.extractionHints || []).join(", ") || "-"}</div>
+      <strong>${escapeHtml(t("diagnosticsHints"))}:</strong>
+      <div>${escapeHtml((listing.extractionHints || []).join(", ") || "-")}</div>
     </div>
     <div class="diag-list">
-      <strong>${t("diagnosticsMissing")}:</strong>
-      <div>${missing.length ? missing.join(", ") : t("diagnosticsOk")}</div>
+      <strong>${escapeHtml(t("diagnosticsMissing"))}:</strong>
+      <div>${escapeHtml(missing.length ? missing.join(", ") : t("diagnosticsOk"))}</div>
     </div>
   `;
 }

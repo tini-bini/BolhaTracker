@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "BOLHA Price Tracker",
-  "short_name": "Bolha Tracker",
+  "name": "BOLHA Sledilnik cen",
+  "short_name": "Bolha Sledilnik",
   "version": "1.0.0",
-  "description": "Track Bolha.com listing prices locally and get notified when they drop.",
+  "description": "Lokalno spremljajte cene oglasov na Bolhi in prejmite obvestilo ob padcu cene.",
   "minimum_chrome_version": "114",
   "permissions": [
     "storage",
@@ -18,7 +18,7 @@
     "service_worker": "service-worker.js"
   },
   "action": {
-    "default_title": "BOLHA Price Tracker",
+    "default_title": "BOLHA Sledilnik cen",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -39,7 +39,7 @@
         "default": "Ctrl+Shift+Y",
         "mac": "Command+Shift+Y"
       },
-      "description": "Refresh due tracked listings"
+      "description": "Osveži spremljane oglase, ki so na vrsti"
     }
   },
   "options_page": "options.html",

@@ -37,7 +37,7 @@
     refreshIntervalMinutes: 180,
     notificationsEnabled: true,
     badgeCountEnabled: true,
-    locale: "auto",
+    locale: "sl",
     onboardingCompleted: false,
     savedViews: []
   };
@@ -110,8 +110,8 @@
     extractionHints: [
       "JSON-LD Product block",
       "ClassifiedDetailSummary boot payload",
-      "Open Graph meta tags",
-      "Bolha DOM selectors"
+      "Meta oznake Open Graph",
+      "Selektorji DOM za Bolho"
     ]
   };
 
@@ -223,7 +223,7 @@
 
   function formatCurrency(amount, currency) {
     if (amount == null || Number.isNaN(amount)) {
-      return "Price unavailable";
+      return "Cena ni na voljo";
     }
 
     try {
@@ -302,7 +302,7 @@
 
   function formatDateTime(timestamp, locale) {
     if (!timestamp) {
-      return "Never";
+      return "Nikoli";
     }
 
     try {
@@ -576,7 +576,7 @@
       refreshIntervalMinutes: REFRESH_INTERVALS.includes(interval) ? interval : DEFAULT_SETTINGS.refreshIntervalMinutes,
       notificationsEnabled: merged.notificationsEnabled !== false,
       badgeCountEnabled: merged.badgeCountEnabled !== false,
-      locale: ["auto", "en", "sl"].includes(merged.locale) ? merged.locale : DEFAULT_SETTINGS.locale,
+      locale: "sl",
       onboardingCompleted: Boolean(merged.onboardingCompleted),
       savedViews: normalizeSavedViews(merged.savedViews)
     };
@@ -644,12 +644,12 @@
     const price = rawListing.price != null ? rawListing.price : parsedPrice.amount;
     const priceText =
       cleanText(rawListing.priceText) ||
-      (price != null ? formatCurrency(price, currency) : rawListing.available === false ? "Listing unavailable" : "Price not detected");
+      (price != null ? formatCurrency(price, currency) : rawListing.available === false ? "Oglas ni na voljo" : "Cena ni zaznana");
 
     return {
       id: getListingId(normalizedUrl),
       url: normalizedUrl,
-      title: cleanText(rawListing.title) || "Bolha listing",
+      title: cleanText(rawListing.title) || "Bolha oglas",
       price,
       priceText,
       currency,
@@ -733,7 +733,7 @@
 
     if (!listing.available) {
       listing.price = null;
-      listing.priceText = "Listing unavailable";
+      listing.priceText = "Oglas ni na voljo";
     }
 
     return listing;
@@ -774,7 +774,7 @@
 
     if (!listing.available) {
       listing.price = null;
-      listing.priceText = "Listing unavailable";
+      listing.priceText = "Oglas ni na voljo";
     }
 
     return {
@@ -843,9 +843,9 @@
     return {
       id,
       url,
-      title: cleanText(rawItem && rawItem.title) || "Bolha listing",
+      title: cleanText(rawItem && rawItem.title) || "Bolha oglas",
       price: currentPrice,
-      priceText: cleanText(rawItem && rawItem.priceText) || (currentPrice != null ? formatCurrency(currentPrice, rawItem && rawItem.currency) : "Price not detected"),
+      priceText: cleanText(rawItem && rawItem.priceText) || (currentPrice != null ? formatCurrency(currentPrice, rawItem && rawItem.currency) : "Cena ni zaznana"),
       currency: cleanText(rawItem && rawItem.currency) || "EUR",
       imageUrl: rawItem && rawItem.imageUrl ? rawItem.imageUrl : null,
       sellerName: cleanText(rawItem && rawItem.sellerName) || null,
@@ -954,7 +954,7 @@
     const merged = normalizeStoredListing({
       ...previous,
       title:
-        latest.title && !/^(oglas ne obstaja|bolha listing)$/i.test(latest.title)
+        latest.title && !/^(oglas ne obstaja|bolha oglas)$/i.test(latest.title)
           ? latest.title
           : previous.title,
       price: nextPrice,
@@ -1010,7 +1010,7 @@
     const next = normalizeStoredListing({
       ...previous,
       lastChecked: Date.now(),
-      lastError: error.message || "Unable to refresh this listing right now.",
+      lastError: error.message || "Tega oglasa trenutno ni mogoče osvežiti.",
       consecutiveErrorCount: previous.consecutiveErrorCount + 1
     });
 
@@ -1200,7 +1200,7 @@
 
   function createExportPayload(items, settings) {
     return {
-      app: "BOLHA Price Tracker",
+      app: "BOLHA Sledilnik cen",
       version: EXPORT_VERSION,
       exportedAt: Date.now(),
       settings: sanitizeSettings(settings),

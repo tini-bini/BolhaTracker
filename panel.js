@@ -182,7 +182,7 @@
           <div class="skel-line w45"></div>
         </div>`;
     } else if (!listing || !listing.isListing) {
-      bodyHtml = `<div class="p-empty">Not a trackable Bolha listing.</div>`;
+      bodyHtml = `<div class="p-empty">Tega oglasa na Bolhi ni mogoče spremljati.</div>`;
     } else {
       const unavailable = listing.available === false;
       const isTracked = Boolean(tracked);
@@ -225,18 +225,18 @@
       if (isTracked) {
         actionsHtml = `
           <button class="btn btn-secondary" data-action="refresh" ${refreshing ? 'disabled' : ''}>
-            ${refreshing ? 'Refreshing…' : 'Refresh'}
+            ${refreshing ? 'Osvežujem ...' : 'Osveži'}
           </button>
-          <button class="btn btn-danger" data-action="remove">Remove</button>
-          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Open ↗</a>`;
+          <button class="btn btn-danger" data-action="remove">Odstrani</button>
+          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>`;
       } else if (unavailable) {
         actionsHtml = `
-          <button class="btn btn-secondary" disabled>Unavailable</button>
-          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Open ↗</a>`;
+          <button class="btn btn-secondary" disabled>Ni na voljo</button>
+          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>`;
       } else {
         actionsHtml = `
-          <button class="btn btn-primary" data-action="track">Track price</button>
-          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Open ↗</a>`;
+          <button class="btn btn-primary" data-action="track">Spremljaj ceno</button>
+          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>`;
       }
 
       bodyHtml = `
@@ -260,7 +260,7 @@
 
     const minimizeIcon = minimized ? '▲' : '▼';
     const themeIcon = state.theme === 'light' ? '☾' : '☀';
-    const themeTitle = state.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+    const themeTitle = state.theme === 'light' ? 'Preklopi na temno temo' : 'Preklopi na svetlo temo';
 
     const handlesHtml = minimized ? '' : `
       <div class="rh rh-n"  data-resize="n"></div>
@@ -277,13 +277,13 @@
         <div class="p-header" data-drag>
           <div class="p-header-left">
             <span class="p-logo">B</span>
-            <span class="p-brand">Bolha Tracker</span>
+            <span class="p-brand">Bolha Sledilnik</span>
           </div>
           <div class="p-header-right">
-            <button class="btn btn-donate" data-action="donate" title="Support development" ${DONATION_URL ? "" : "disabled"}>Donate</button>
+            <button class="btn btn-donate" data-action="donate" title="Podpri razvoj" ${DONATION_URL ? "" : "disabled"}>Podpri</button>
             <button class="btn-theme p-hbtn" data-action="theme" title="${esc(themeTitle)}">${esc(themeIcon)}</button>
-            <button class="p-hbtn" data-action="minimize" title="${minimized ? 'Expand' : 'Minimize'}">${minimizeIcon}</button>
-            <button class="p-hbtn" data-action="close" title="Close">×</button>
+            <button class="p-hbtn" data-action="minimize" title="${minimized ? 'Razširi' : 'Strni'}">${minimizeIcon}</button>
+            <button class="p-hbtn" data-action="close" title="Zapri">×</button>
           </div>
         </div>
         ${minimized ? '' : bodyHtml}

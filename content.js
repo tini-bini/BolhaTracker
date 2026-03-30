@@ -22,7 +22,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } catch (error) {
       sendResponse({
         ok: false,
-        error: error.message || "Unable to read this Bolha page."
+        error: error.message || "Te strani na Bolhi ni bilo mogoče prebrati."
       });
     }
   }

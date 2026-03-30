@@ -1,41 +1,41 @@
-# Release Checklist
+# Kontrolni seznam izdaje
 
-## Pre-upload
+## Pred nalaganjem
 
-1. Run `python scripts/validate_release.py`
-2. Confirm `dist/bolha-price-tracker-v1.0.0.zip` exists
-3. Load the unpacked extension in Chrome and smoke-test:
-   - popup opens
-   - current page listing detection works on a real Bolha listing
-   - track, refresh, remove, and notes/tag save flows work
-   - donation button opens the PayPal.Me page
-   - options page opens and cloud backup buttons render correctly
-4. Confirm the extension icon assets render correctly at 16/32/48/128 sizes
+1. Zaženite `python scripts/validate_release.py`.
+2. Potrdite, da obstaja `dist/bolha-price-tracker-v1.0.0.zip`.
+3. V Chromu naložite razpakirano razširitev in izvedite osnovni preizkus:
+   - pojavno okno se odpre
+   - zaznavanje oglasa na trenutni strani deluje na pravem oglasu na Bolhi
+   - delujejo tokovi spremljanja, osvežitve, odstranitve ter shranjevanja opomb in oznak
+   - gumb za podporo odpre stran PayPal.Me
+   - stran z nastavitvami se odpre in gumbi za varnostno kopijo v oblaku se pravilno izrišejo
+4. Potrdite, da se ikone razširitve pravilno prikazujejo v velikostih 16/32/48/128.
 
-## Chrome Web Store Dashboard Upload
+## Nalaganje v nadzorno ploščo Chrome Web Store
 
-1. Open the Chrome Web Store Developer Dashboard
-2. Choose the existing item or create a new listing
-3. Upload `dist/bolha-price-tracker-v1.0.0.zip`
-4. Verify the auto-detected permissions:
+1. Odprite Chrome Web Store Developer Dashboard.
+2. Izberite obstoječi vnos ali ustvarite novega.
+3. Naložite `dist/bolha-price-tracker-v1.0.0.zip`.
+4. Preverite samodejno zaznana dovoljenja:
    - `storage`
    - `notifications`
    - `alarms`
    - `tabs`
-   - host permission for `https://www.bolha.com/*`
-5. Update the listing copy/screenshots if needed
-6. Submit for review
+   - dovoljenje gostitelja za `https://www.bolha.com/*`
+5. Po potrebi posodobite besedila vnosa in posnetke zaslona.
+6. Oddajte v pregled.
 
-## Manual Inputs Still Required
+## Še vedno potrebni ročni vnosi
 
-- Chrome Web Store listing metadata and screenshots
-- Store description localization, if you want dashboard-managed copy beyond the extension UI text
-- Final publisher review and submission confirmation in the dashboard
+- metapodatki vnosa v Chrome Web Store in posnetki zaslona
+- lokalizacija opisa v trgovini, če želite poleg besedila v uporabniškem vmesniku upravljati tudi besedilo v nadzorni plošči
+- končni pregled izdajatelja in potrditev oddaje v nadzorni plošči
 
-## Manual PayPal Verification
+## Ročno preverjanje PayPala
 
-1. Load the extension in Chrome
-2. Open popup, options page, and in-page panel on a Bolha listing
-3. Click each donation CTA
-4. Confirm the browser opens `https://paypal.me/TiniFlegar`
-5. Confirm the CTA is disabled if the configured link is removed or intentionally malformed in `utils.js`
+1. V Chromu naložite razširitev.
+2. Na oglasu Bolha odprite pojavno okno, stran z nastavitvami in ploščo na strani.
+3. Kliknite vsak gumb za podporo.
+4. Potrdite, da brskalnik odpre `https://paypal.me/TiniFlegar`.
+5. Potrdite, da je gumb onemogočen, če je nastavljena povezava odstranjena ali namenoma pokvarjena v `utils.js`.
