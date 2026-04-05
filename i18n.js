@@ -1,5 +1,5 @@
 (function initBolhaTrackerI18n(global) {
-  const { STATUS, formatCurrency } = global.BolhaTrackerUtils || {};
+  const { STATUS, ENTITLEMENT_STATUS, formatCurrency } = global.BolhaTrackerUtils || {};
 
   const BASE_MESSAGES = {
     appTitle: "BOLHA Sledilnik cen",
@@ -48,6 +48,77 @@
     openLink: "Odpri",
     settingsLink: "Nastavitve",
     donateLink: "Podpri projekt",
+    premiumStatusKicker: "Lifetime Premium",
+    premiumTitle: "Plačaj enkrat, odkleni za vedno",
+    premiumSubtitle: "Premium je enkratni nakup za zahtevnejše poteke dela. Donacija ostane ločena podpora in ne odklene premiuma.",
+    premiumPlanStatus: "Trenutni plan",
+    premiumPlanFree: "Free",
+    premiumPlanPending: "V preverjanju",
+    premiumPlanFailed: "Plačilo ni uspelo",
+    premiumPlanCancelled: "Preklicano",
+    premiumPlanInvalid: "Potrebna je ponovna sinhronizacija",
+    premiumPlanLifetime: "Premium",
+    premiumPayOnce: "Enkratno plačilo: $1",
+    premiumBuyButton: "Kupi Lifetime Premium",
+    premiumAlreadyPaid: "Preveri ali obnovi dostop",
+    premiumCopyRequest: "Kopiraj podatke naprave",
+    premiumPendingTitle: "Plačilo čaka na strežniško potrditev",
+    premiumPendingCopy: "Checkout je odprt. Po uspešnem plačilu kliknite preverjanje stanja ali na novi napravi uporabite obnovitveno kodo.",
+    premiumVerifyingCopy: "Plačilo preverjamo pri entitlement strežniku. Če je bilo uspešno, se bo dostop odklenil po sinhronizaciji.",
+    premiumActivatedCopy: "Premium je strežniško potrjen in aktiven na tej napravi.",
+    premiumFailedCopy: "Zadnje plačilo ni uspelo. Poskusite znova ali preverite stanje.",
+    premiumCancelledCopy: "Checkout je bil preklican. Dostop ostaja na Free planu, dokler plačilo ni potrjeno.",
+    premiumInvalidCopy: "Shranjeni entitlement ni več veljaven. Osvežite stanje ali obnovite dostop s kodo za obnovo.",
+    premiumFreeCopy: "Premium odklenemo šele po preverjeni strežniški potrditvi plačila. Donacija ostane ločena podpora projektu.",
+    premiumSeparateDonate: "Podpri projekt brez odklepa premiuma",
+    premiumVerifyButton: "Preveri stanje",
+    premiumRestoreButton: "Obnovi dostop",
+    premiumCheckoutOpenButton: "Odpri checkout",
+    premiumRestoreEmailLabel: "E-pošta nakupa",
+    premiumRestoreCodeLabel: "Obnovitvena koda",
+    premiumRestoreHint: "Na novi napravi vnesite e-pošto nakupa in obnovitveno kodo, ki jo prejmete po uspešnem plačilu.",
+    premiumInstallCodeLabel: "Koda namestitve",
+    premiumRestoreCodeValueLabel: "Koda za obnovo",
+    premiumPurchaseEmailLabel: "Nakupna e-pošta",
+    premiumLastVerifiedLabel: "Nazadnje preverjeno",
+    premiumFailureLabel: "Zadnja napaka",
+    premiumCheckoutLabel: "Checkout seja",
+    premiumCompareTitle: "Free proti Premium",
+    premiumFreeColumn: "Free",
+    premiumPremiumColumn: "Premium",
+    premiumFeatureTracked: "Število spremljanih oglasov",
+    premiumFeatureTrackedFreeValue: "Do $1 oglasov",
+    premiumFeatureTrackedPremiumValue: "Neomejeno",
+    premiumFeatureBulkRefresh: "Osveži oglase na vrsti",
+    premiumFeatureBulkRefreshFreeValue: "Ne",
+    premiumFeatureBulkRefreshPremiumValue: "Da",
+    premiumFeatureNotes: "Opombe, oznake in opozorila prodajalca",
+    premiumFeatureNotesFreeValue: "Osnovni ogled",
+    premiumFeatureNotesPremiumValue: "Polno urejanje",
+    premiumFeatureSavedViews: "Shranjeni pogledi",
+    premiumFeatureSavedViewsFreeValue: "1 pogled",
+    premiumFeatureSavedViewsPremiumValue: "Do 6 pogledov",
+    premiumFeatureCloud: "Chrome Sync backup",
+    premiumFeatureCloudFreeValue: "Ne",
+    premiumFeatureCloudPremiumValue: "Da",
+    premiumFeatureAnalytics: "Napredna analitika cen",
+    premiumFeatureAnalyticsFreeValue: "Ne",
+    premiumFeatureAnalyticsPremiumValue: "Da",
+    premiumPendingToast: "Checkout za Premium je odprt v novem zavihku.",
+    premiumActivatedToast: "Lifetime Premium je zdaj potrjeno aktiven na tej napravi.",
+    premiumSupportCopied: "Podatki naprave in premium stanja so kopirani.",
+    premiumCopyFailed: "Kopiranje ni uspelo. Poskusite znova.",
+    premiumSyncToast: "Premium stanje je bilo osveženo.",
+    premiumRestoreToast: "Premium dostop je bil uspešno obnovljen.",
+    premiumLockedTracked: "Free plan podpira do $1 spremljanih oglasov. Za neomejeno število nadgradite na Lifetime Premium.",
+    premiumLockedFeature: "Ta funkcija spada v Lifetime Premium.",
+    premiumLockedBulkRefresh: "Paketno osveževanje oglasov na vrsti je del Lifetime Premium.",
+    premiumLockedSavedViews: "Free plan omogoča do $1 shranjen pogled.",
+    premiumLockedNotes: "Opombe, oznake in opozorila prodajalca so del Lifetime Premium.",
+    premiumLockedCloud: "Chrome Sync backup je del Lifetime Premium.",
+    premiumLockedAnalytics: "Napredna analitika cen je del Lifetime Premium.",
+    premiumLockedTrackButton: "Premium za neomejeno spremljanje",
+    premiumLockedTrackHint: "Free plan je dosegel mejo spremljanih oglasov.",
     refresh: "Osveži",
     refreshing: "Osvežujem ...",
     remove: "Odstrani",
@@ -184,6 +255,7 @@
     toastImportFailed: "Uvoz ni uspel. Preverite datoteko in poskusite znova.",
     toastImportDone: "Uvoženih oglasov: $1.",
     openBolhaButton: "Odpri Bolho",
+    openDashboardPage: "Odpri pregled",
     refreshDueButton: "Osveži oglase na vrsti ($1)",
     overviewTitle: "Pregled seznama spremljanja",
     overviewSubtitle: "Spremljajte stanje seznama, oglase na vrsti in naslednji pomemben trenutek.",
@@ -414,6 +486,74 @@
     return getMessage("notificationBodyDrop", preferredLocale, [title, before, after]);
   }
 
+  function getPlanLabel(plan, preferredLocale) {
+    if (plan === "premium_lifetime") {
+      return getMessage("premiumPlanLifetime", preferredLocale);
+    }
+
+    if (plan === "payment_pending") {
+      return getMessage("premiumPlanPending", preferredLocale);
+    }
+
+    return getMessage("premiumPlanFree", preferredLocale);
+  }
+
+  function getEntitlementLabel(entitlement, preferredLocale) {
+    const status = entitlement && entitlement.status;
+
+    if (status === ENTITLEMENT_STATUS.PREMIUM_ACTIVE) {
+      return getMessage("premiumPlanLifetime", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.PAYMENT_FAILED) {
+      return getMessage("premiumPlanFailed", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.PAYMENT_CANCELLED) {
+      return getMessage("premiumPlanCancelled", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.ENTITLEMENT_INVALID) {
+      return getMessage("premiumPlanInvalid", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.CHECKOUT_PENDING || status === ENTITLEMENT_STATUS.VERIFICATION_PENDING) {
+      return getMessage("premiumPlanPending", preferredLocale);
+    }
+
+    return getPlanLabel(entitlement && entitlement.plan, preferredLocale);
+  }
+
+  function getEntitlementCopy(entitlement, preferredLocale) {
+    const status = entitlement && entitlement.status;
+
+    if (status === ENTITLEMENT_STATUS.PREMIUM_ACTIVE) {
+      return getMessage("premiumActivatedCopy", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.CHECKOUT_PENDING) {
+      return getMessage("premiumPendingCopy", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.VERIFICATION_PENDING) {
+      return getMessage("premiumVerifyingCopy", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.PAYMENT_FAILED) {
+      return getMessage("premiumFailedCopy", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.PAYMENT_CANCELLED) {
+      return getMessage("premiumCancelledCopy", preferredLocale);
+    }
+
+    if (status === ENTITLEMENT_STATUS.ENTITLEMENT_INVALID) {
+      return getMessage("premiumInvalidCopy", preferredLocale);
+    }
+
+    return getMessage("premiumFreeCopy", preferredLocale);
+  }
+
   global.BolhaTrackerI18n = {
     MESSAGES,
     resolveLocale,
@@ -426,6 +566,9 @@
     getStatusSummary,
     getPriceDifferenceSummary,
     getRecoverySummary,
-    getNotificationMessage
+    getNotificationMessage,
+    getPlanLabel,
+    getEntitlementLabel,
+    getEntitlementCopy
   };
 })(globalThis);

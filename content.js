@@ -8,7 +8,7 @@ function getCurrentPageListing() {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || !message.type) {
+  if (!message || !message.type || sender.id !== chrome.runtime.id) {
     return false;
   }
 

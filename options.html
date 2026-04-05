@@ -16,11 +16,34 @@
           </div>
           <div class="hero-actions">
             <button class="button button-theme" id="theme-button" type="button" title="Preklopi temo"></button>
+            <button class="button button-secondary button-small" id="open-dashboard-button" type="button"></button>
             <button class="button button-donate" id="donate-button" type="button"></button>
           </div>
         </div>
         <p class="hero-copy" id="hero-subtitle"></p>
       </header>
+
+      <section class="panel split-panel premium-section">
+        <div>
+          <div class="section-head">
+            <h2 id="premium-title"></h2>
+            <p id="premium-subtitle"></p>
+          </div>
+          <div class="shortcut-card premium-status-card" id="premium-status-card"></div>
+          <div class="action-stack premium-actions">
+            <button class="button button-primary" id="buy-premium-button" type="button"></button>
+            <button class="button button-secondary" id="already-paid-button" type="button"></button>
+            <button class="button button-secondary" id="copy-premium-request-button" type="button"></button>
+          </div>
+        </div>
+        <div>
+          <div class="section-head">
+            <h2 id="premium-compare-title"></h2>
+            <p id="premium-separate-donate"></p>
+          </div>
+          <div class="premium-comparison" id="premium-comparison"></div>
+        </div>
+      </section>
 
       <section class="panel split-panel">
         <div>
@@ -85,18 +108,35 @@
             <span id="language-label"></span>
             <select id="language" class="input"></select>
           </label>
-          <label class="toggle">
-            <input type="checkbox" id="scheduled-refresh">
-            <span id="scheduled-refresh-label"></span>
-          </label>
-          <label class="toggle">
-            <input type="checkbox" id="notifications-enabled">
-            <span id="notifications-label"></span>
-          </label>
-          <label class="toggle">
-            <input type="checkbox" id="badge-count">
-            <span id="badge-count-label"></span>
-          </label>
+          <div class="toggle-stack options-toggle-stack">
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" id="scheduled-refresh-label"></span>
+              </span>
+              <span class="toggle-control">
+                <input type="checkbox" id="scheduled-refresh">
+                <span class="toggle-track"></span>
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" id="notifications-label"></span>
+              </span>
+              <span class="toggle-control">
+                <input type="checkbox" id="notifications-enabled">
+                <span class="toggle-track"></span>
+              </span>
+            </label>
+            <label class="toggle-row">
+              <span class="toggle-copy">
+                <span class="toggle-title" id="badge-count-label"></span>
+              </span>
+              <span class="toggle-control">
+                <input type="checkbox" id="badge-count">
+                <span class="toggle-track"></span>
+              </span>
+            </label>
+          </div>
         </div>
         <div class="section-actions">
           <button class="button button-primary" id="save-settings-button" type="button"></button>

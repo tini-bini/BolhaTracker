@@ -18,7 +18,16 @@ def extract_get_element_ids(js_source: str) -> set[str]:
 
 
 def ensure_dom_contracts() -> None:
-    dynamic_ids = {"dismiss-onboarding-button", "onboarding-settings-button", "track-current-button"}
+    dynamic_ids = {
+        "dismiss-onboarding-button",
+        "onboarding-settings-button",
+        "track-current-button",
+        "buy-premium-button",
+        "already-paid-button",
+        "copy-premium-request-button",
+        "premium-restore-email",
+        "premium-restore-code",
+    }
 
     for html_name, js_name in HTML_JS_PAIRS:
         html_ids = extract_ids((ROOT / html_name).read_text(encoding="utf-8"))
@@ -44,6 +53,13 @@ def ensure_paypal_configuration_is_safe() -> None:
         raise SystemExit("PayPal.Me validation helpers are missing.")
 
 
+def ensure_no_client_side_premium_unlock() -> None:
+    for path in ("popup.js", "options.js", "panel.js", "service-worker.js", "utils.js"):
+        source = (ROOT / path).read_text(encoding="utf-8")
+        if "activatePremiumLifetime(" in source:
+            raise SystemExit(f"Insecure client-side premium activation remains in {path}.")
+
+
 def main() -> None:
     print_step("checking DOM contracts")
     ensure_dom_contracts()
@@ -51,6 +67,8 @@ def main() -> None:
     ensure_message_types_are_handled()
     print_step("checking PayPal.Me validation hooks")
     ensure_paypal_configuration_is_safe()
+    print_step("checking premium activation hardening")
+    ensure_no_client_side_premium_unlock()
     print("typecheck ok")
 
 

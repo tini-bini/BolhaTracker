@@ -1,0 +1,23 @@
+{
+  "name": "bolha-sledilnik-cen",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BOLHA Sledilnik cen extension workspace with entitlement backend and test tooling.",
+  "scripts": {
+    "server:start": "node server/index.js",
+    "build:release": "python scripts/build_release.py",
+    "build:release:production": "python scripts/build_release.py",
+    "validate:release": "python scripts/validate_release.py",
+    "test:unit": "node --test tests/utils.test.js tests/server.test.js",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:e2e": "playwright test --grep-invert @smoke",
+    "test:all": "npm run test:unit && npm run test:smoke && npm run test:e2e"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "stripe": "^17.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

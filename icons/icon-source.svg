@@ -1,69 +1,42 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="tile" x1="240" y1="150" x2="794" y2="864" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#32353A"/>
-      <stop offset="1" stop-color="#1B1E22"/>
+    <linearGradient id="tile" x1="512" y1="112" x2="512" y2="912" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3C4951"/>
+      <stop offset="1" stop-color="#2D3940"/>
     </linearGradient>
-    <radialGradient id="panelGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(430 292) rotate(31) scale(364 248)">
-      <stop stop-color="white" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="white" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="coreGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(606 446) rotate(125) scale(320 284)">
-      <stop stop-color="#75B183" stop-opacity="0.58"/>
-      <stop offset="1" stop-color="#75B183" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="glassStroke" x1="314" y1="675" x2="716" y2="287" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#EAF5EE" stop-opacity="0.52"/>
-      <stop offset="1" stop-color="#F7FBF8" stop-opacity="0.7"/>
+    <linearGradient id="stripe" x1="112" y1="0" x2="912" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16A7DC"/>
+      <stop offset="0.34" stop-color="#8FC642"/>
+      <stop offset="0.67" stop-color="#F6C52F"/>
+      <stop offset="1" stop-color="#EF0A87"/>
     </linearGradient>
-    <linearGradient id="glassBar" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#F4FBF6" stop-opacity="0.55"/>
-      <stop offset="1" stop-color="#CDEBD4" stop-opacity="0.38"/>
-    </linearGradient>
-    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(669 331) rotate(135) scale(80 77)">
-      <stop stop-color="#F1FBF5"/>
-      <stop offset="0.36" stop-color="#9CD8A8"/>
-      <stop offset="1" stop-color="#75B183"/>
-    </radialGradient>
-    <filter id="shadow" x="95" y="112" width="834" height="834" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <filter id="shadow" x="76" y="88" width="872" height="888" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feFlood flood-opacity="0" result="BackgroundImageFix"/>
       <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-      <feOffset dy="26"/>
-      <feGaussianBlur stdDeviation="28"/>
-      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.35 0"/>
-      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_2"/>
-      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_2" result="shape"/>
+      <feOffset dy="28"/>
+      <feGaussianBlur stdDeviation="18"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.11 0 0 0 0 0.14 0 0 0 0 0.16 0 0 0 0.22 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
     </filter>
-    <filter id="softBlur" x="134" y="126" width="756" height="594" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-      <feGaussianBlur stdDeviation="22" result="effect1_foregroundBlur_1_2"/>
-    </filter>
-  </defs>
-  <g filter="url(#shadow)">
-    <rect x="114" y="114" width="796" height="796" rx="224" fill="url(#tile)"/>
-    <rect x="118" y="118" width="788" height="788" rx="220" stroke="white" stroke-opacity="0.14" stroke-width="8"/>
-  </g>
-  <g clip-path="url(#clip0_1_2)">
-    <ellipse cx="450" cy="286" rx="318" ry="176" fill="url(#panelGlow)"/>
-    <ellipse cx="570" cy="506" rx="278" ry="244" fill="url(#coreGlow)"/>
-    <g filter="url(#softBlur)">
-      <ellipse cx="400" cy="272" rx="228" ry="82" fill="white" fill-opacity="0.16"/>
-    </g>
-  </g>
-  <path d="M314 675L434 580L536 478L649 387" stroke="url(#glassStroke)" stroke-width="118" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M314 675L434 580L536 478L649 387" stroke="#F4FBF7" stroke-opacity="0.78" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="245" y="320" width="90" height="349" rx="45" fill="url(#glassBar)"/>
-  <circle cx="314" cy="675" r="36" fill="#F7FCF8" fill-opacity="0.48"/>
-  <circle cx="434" cy="580" r="36" fill="#F7FCF8" fill-opacity="0.48"/>
-  <circle cx="536" cy="478" r="36" fill="#F7FCF8" fill-opacity="0.48"/>
-  <circle cx="649" cy="387" r="118" fill="#75B183" fill-opacity="0.22"/>
-  <circle cx="649" cy="387" r="55" fill="url(#orb)"/>
-  <circle cx="649" cy="387" r="53" stroke="white" stroke-opacity="0.56" stroke-width="6"/>
-  <ellipse cx="625" cy="359" rx="18" ry="13" fill="white" fill-opacity="0.78"/>
-  <defs>
-    <clipPath id="clip0_1_2">
-      <rect x="114" y="114" width="796" height="796" rx="224" fill="white"/>
+    <clipPath id="tileClip">
+      <rect x="112" y="112" width="800" height="800" rx="224"/>
     </clipPath>
   </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="112" y="112" width="800" height="800" rx="224" fill="url(#tile)"/>
+    <rect x="112" y="112" width="800" height="58" fill="url(#stripe)" clip-path="url(#tileClip)"/>
+    <rect x="116" y="116" width="792" height="792" rx="220" stroke="white" stroke-opacity="0.12" stroke-width="8"/>
+  </g>
+
+  <path
+    d="M296 678L446 570L582 458L720 338"
+    stroke="#F8FBFC"
+    stroke-width="90"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="720" cy="338" r="72" fill="#8FC642"/>
+  <circle cx="720" cy="338" r="72" stroke="#F8FBFC" stroke-width="20"/>
 </svg>

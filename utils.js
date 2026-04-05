@@ -1,12 +1,63 @@
 (function initBolhaTrackerUtils(global) {
   const STORAGE_KEY = "trackedListings";
   const SETTINGS_KEY = "trackerSettings";
+  const ENTITLEMENT_KEY = "trackerEntitlement";
+  const BACKEND_CONFIG_KEY = "trackerBackendConfig";
   const EXPORT_VERSION = 2;
+  const MAX_HTML_SOURCE_LENGTH = 1024 * 1024;
+  const MAX_IMPORT_SIZE_BYTES = 1024 * 1024;
   const HISTORY_LIMIT = 24;
   const MAX_TAGS = 8;
   const MAX_SAVED_VIEWS = 6;
+  const MAX_NOTES_LENGTH = 500;
+  const MAX_QUERY_LENGTH = 80;
+  const MAX_TITLE_LENGTH = 220;
   const ALARM_NAME = "scheduled-refresh";
   const DONATION_URLS = ["https://paypal.me/TiniFlegar"];
+  const PREMIUM_LIFETIME_PRICE = 4.99;
+  const PREMIUM_LIFETIME_CURRENCY = "EUR";
+  const PREMIUM_SERVER_ORIGIN = "http://127.0.0.1:8787";
+  const ENTITLEMENT_KEY_ID = "dev-local-v1";
+  const ENTITLEMENT_PUBLIC_KEYS = {
+    [ENTITLEMENT_KEY_ID]: [
+      "-----BEGIN PUBLIC KEY-----",
+      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAENKPR9rFWK7O8sf1/NgDdNKCFtZIs",
+      "a+s6HV9cUMvjOy0K36j+O7NAoFXUt4l9WJf3sccmdtQqvt/Rxmuh4AcG7A==",
+      "-----END PUBLIC KEY-----"
+    ].join("\n")
+  };
+  const ENTITLEMENT_SYNC_INTERVAL_MS = 1000 * 60 * 15;
+
+  const PLAN = {
+    FREE: "free",
+    PAYMENT_PENDING: "payment_pending",
+    PREMIUM_LIFETIME: "premium_lifetime"
+  };
+
+  const ENTITLEMENT_STATUS = {
+    FREE: "free",
+    CHECKOUT_PENDING: "checkout_pending",
+    VERIFICATION_PENDING: "verification_pending",
+    PREMIUM_ACTIVE: "premium_active",
+    PAYMENT_FAILED: "payment_failed",
+    PAYMENT_CANCELLED: "payment_cancelled",
+    ENTITLEMENT_INVALID: "entitlement_invalid"
+  };
+
+  const PREMIUM_FEATURES = {
+    TRACKED_LISTINGS: "trackedListings",
+    SAVED_VIEWS: "savedViews",
+    BULK_REFRESH: "bulkRefresh",
+    ADVANCED_NOTES: "advancedNotes",
+    SELLER_ALERTS: "sellerAlerts",
+    CLOUD_BACKUP: "cloudBackup",
+    ANALYTICS: "analytics"
+  };
+
+  const FREE_LIMITS = {
+    trackedListings: 10,
+    savedViews: 1
+  };
 
   const STATUS = {
     UNCHANGED: "unchanged",
@@ -29,7 +80,11 @@
     REFRESH_DUE_LISTINGS: "REFRESH_DUE_LISTINGS",
     CREATE_SYNC_BACKUP: "CREATE_SYNC_BACKUP",
     RESTORE_SYNC_BACKUP: "RESTORE_SYNC_BACKUP",
-    GET_SYNC_BACKUP_STATUS: "GET_SYNC_BACKUP_STATUS"
+    GET_SYNC_BACKUP_STATUS: "GET_SYNC_BACKUP_STATUS",
+    OPEN_EXTENSION_PAGE: "OPEN_EXTENSION_PAGE",
+    CREATE_CHECKOUT_SESSION: "CREATE_CHECKOUT_SESSION",
+    SYNC_ENTITLEMENT: "SYNC_ENTITLEMENT",
+    RESTORE_PREMIUM_ACCESS: "RESTORE_PREMIUM_ACCESS"
   };
 
   const DEFAULT_SETTINGS = {
@@ -130,9 +185,204 @@
     }
   }
 
+  function base64ToUint8Array(value) {
+    const raw = String(value || "");
+
+    if (!raw) {
+      return new Uint8Array();
+    }
+
+    const binary = typeof atob === "function"
+      ? atob(raw)
+      : global.Buffer
+        ? global.Buffer.from(raw, "base64").toString("binary")
+        : "";
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return bytes;
+  }
+
+  function pemToArrayBuffer(pem) {
+    const body = String(pem || "")
+      .replace(/-----BEGIN PUBLIC KEY-----/g, "")
+      .replace(/-----END PUBLIC KEY-----/g, "")
+      .replace(/\s+/g, "");
+
+    return base64ToUint8Array(body).buffer;
+  }
+
+  function textToUint8Array(value) {
+    return new TextEncoder().encode(String(value || ""));
+  }
+
+  function readDerLength(bytes, offset) {
+    const first = bytes[offset];
+
+    if (first == null) {
+      throw new Error("Invalid DER length.");
+    }
+
+    if (first < 0x80) {
+      return {
+        length: first,
+        nextOffset: offset + 1
+      };
+    }
+
+    const size = first & 0x7f;
+
+    if (!size || size > 4) {
+      throw new Error("Unsupported DER length.");
+    }
+
+    let length = 0;
+
+    for (let index = 0; index < size; index += 1) {
+      length = (length << 8) | bytes[offset + 1 + index];
+    }
+
+    return {
+      length,
+      nextOffset: offset + 1 + size
+    };
+  }
+
+  function normalizeDerInteger(bytes, size) {
+    let normalized = bytes;
+
+    while (normalized.length > 1 && normalized[0] === 0) {
+      normalized = normalized.slice(1);
+    }
+
+    if (normalized.length > size) {
+      throw new Error("DER integer exceeds expected size.");
+    }
+
+    const output = new Uint8Array(size);
+    output.set(normalized, size - normalized.length);
+    return output;
+  }
+
+  function derSignatureToRaw(bytes, coordinateSize = 32) {
+    if (!(bytes instanceof Uint8Array) || bytes.length < 8 || bytes[0] !== 0x30) {
+      return bytes;
+    }
+
+    let offset = 1;
+    const sequenceLengthInfo = readDerLength(bytes, offset);
+    offset = sequenceLengthInfo.nextOffset;
+
+    if (bytes[offset] !== 0x02) {
+      throw new Error("Invalid DER signature.");
+    }
+
+    offset += 1;
+    const rLengthInfo = readDerLength(bytes, offset);
+    offset = rLengthInfo.nextOffset;
+    const r = bytes.slice(offset, offset + rLengthInfo.length);
+    offset += rLengthInfo.length;
+
+    if (bytes[offset] !== 0x02) {
+      throw new Error("Invalid DER signature.");
+    }
+
+    offset += 1;
+    const sLengthInfo = readDerLength(bytes, offset);
+    offset = sLengthInfo.nextOffset;
+    const s = bytes.slice(offset, offset + sLengthInfo.length);
+
+    const raw = new Uint8Array(coordinateSize * 2);
+    raw.set(normalizeDerInteger(r, coordinateSize), 0);
+    raw.set(normalizeDerInteger(s, coordinateSize), coordinateSize);
+    return raw;
+  }
+
+  const importedEntitlementKeyCache = new Map();
+
+  async function importEntitlementPublicKey(keyId) {
+    if (importedEntitlementKeyCache.has(keyId)) {
+      return importedEntitlementKeyCache.get(keyId);
+    }
+
+    const subtle = global.crypto && global.crypto.subtle;
+    const publicKeyPem = ENTITLEMENT_PUBLIC_KEYS[keyId];
+
+    if (!subtle || !publicKeyPem) {
+      return null;
+    }
+
+    const promise = subtle.importKey(
+      "spki",
+      pemToArrayBuffer(publicKeyPem),
+      {
+        name: "ECDSA",
+        namedCurve: "P-256"
+      },
+      false,
+      ["verify"]
+    ).catch(() => null);
+
+    importedEntitlementKeyCache.set(keyId, promise);
+    return promise;
+  }
+
+  function clampString(value, maxLength) {
+    return String(value || "").slice(0, Math.max(0, Number(maxLength) || 0));
+  }
+
+  function isSafeWebUrl(rawUrl, options = {}) {
+    const {
+      allowHosts = null,
+      httpsOnly = false,
+      allowData = false
+    } = options || {};
+
+    try {
+      const url = new URL(String(rawUrl).trim());
+      const protocol = url.protocol.toLowerCase();
+
+      if (allowData && protocol === "data:") {
+        return true;
+      }
+
+      if (!["http:", "https:"].includes(protocol)) {
+        return false;
+      }
+
+      if (httpsOnly && protocol !== "https:") {
+        return false;
+      }
+
+      if (Array.isArray(allowHosts) && allowHosts.length) {
+        return allowHosts.some((host) => {
+          const normalizedHost = String(host || "").toLowerCase();
+          const currentHost = url.hostname.toLowerCase();
+          return currentHost === normalizedHost || currentHost.endsWith(`.${normalizedHost}`);
+        });
+      }
+
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function sanitizeHtmlSource(value) {
+    return clampString(value, MAX_HTML_SOURCE_LENGTH);
+  }
+
   function normalizeUrl(rawUrl) {
     try {
-      const url = new URL(rawUrl);
+      const url = new URL(String(rawUrl || "").trim());
+
+      if (!isSafeWebUrl(url.toString())) {
+        return "";
+      }
+
       url.hash = "";
       url.search = "";
 
@@ -142,7 +392,7 @@
 
       return url.toString();
     } catch (error) {
-      return rawUrl || "";
+      return "";
     }
   }
 
@@ -180,9 +430,10 @@
     }
 
     try {
-      return new URL(cleaned, baseUrl || "https://www.bolha.com").toString();
+      const resolved = new URL(cleaned, baseUrl || "https://www.bolha.com").toString();
+      return isSafeWebUrl(resolved) ? resolved : null;
     } catch (error) {
-      return cleaned;
+      return null;
     }
   }
 
@@ -564,6 +815,431 @@
     return cleanText(clone.textContent || "");
   }
 
+  function sanitizeEntitlementEnvelope(rawEnvelope) {
+    const raw = rawEnvelope && typeof rawEnvelope === "object" ? rawEnvelope : {};
+    const payload = typeof raw.payload === "string" ? raw.payload : "";
+    const signature = typeof raw.signature === "string" ? raw.signature : "";
+    const keyId = cleanText(raw.keyId) || "";
+
+    if (!payload || !signature || !keyId) {
+      return null;
+    }
+
+    return {
+      keyId,
+      payload,
+      signature
+    };
+  }
+
+  function getEntitlementPlanForStatus(status) {
+    if (status === ENTITLEMENT_STATUS.PREMIUM_ACTIVE) {
+      return PLAN.PREMIUM_LIFETIME;
+    }
+
+    if (status === ENTITLEMENT_STATUS.CHECKOUT_PENDING || status === ENTITLEMENT_STATUS.VERIFICATION_PENDING) {
+      return PLAN.PAYMENT_PENDING;
+    }
+
+    return PLAN.FREE;
+  }
+
+  function sanitizeEntitlement(rawEntitlement) {
+    const raw = rawEntitlement && typeof rawEntitlement === "object" ? rawEntitlement : {};
+    const status = Object.values(ENTITLEMENT_STATUS).includes(raw.status)
+      ? raw.status
+      : raw.plan === PLAN.PREMIUM_LIFETIME
+        ? ENTITLEMENT_STATUS.PREMIUM_ACTIVE
+        : raw.plan === PLAN.PAYMENT_PENDING
+          ? ENTITLEMENT_STATUS.CHECKOUT_PENDING
+          : ENTITLEMENT_STATUS.FREE;
+
+    return {
+      plan: getEntitlementPlanForStatus(status),
+      status,
+      paymentSource: cleanText(raw.paymentSource) || null,
+      paymentStartedAt: Number(raw.paymentStartedAt) || null,
+      paymentAcknowledgedAt: Number(raw.paymentAcknowledgedAt) || null,
+      premiumActivatedAt: Number(raw.premiumActivatedAt) || null,
+      installCode: cleanText(raw.installCode).slice(0, 24) || null,
+      supportMessageCopiedAt: Number(raw.supportMessageCopiedAt) || null,
+      checkoutSessionId: cleanText(raw.checkoutSessionId) || null,
+      checkoutUrl: cleanText(raw.checkoutUrl) || null,
+      restoreCode: cleanText(raw.restoreCode).toUpperCase() || null,
+      maskedEmail: cleanText(raw.maskedEmail) || null,
+      lastVerifiedAt: Number(raw.lastVerifiedAt) || null,
+      lastSyncAttemptAt: Number(raw.lastSyncAttemptAt) || null,
+      lastError: cleanText(raw.lastError) || null,
+      entitlementEnvelope: sanitizeEntitlementEnvelope(raw.entitlementEnvelope)
+    };
+  }
+
+  function sanitizeBackendConfig(rawBackendConfig) {
+    const raw = rawBackendConfig && typeof rawBackendConfig === "object" ? rawBackendConfig : {};
+    const apiBaseUrl = cleanText(raw.apiBaseUrl);
+
+    if (!apiBaseUrl) {
+      return {
+        apiBaseUrl: PREMIUM_SERVER_ORIGIN
+      };
+    }
+
+    if (
+      isSafeWebUrl(apiBaseUrl, { allowHosts: ["127.0.0.1", "localhost"] }) ||
+      isSafeWebUrl(apiBaseUrl, { httpsOnly: true })
+    ) {
+      return {
+        apiBaseUrl: apiBaseUrl.replace(/\/+$/, "")
+      };
+    }
+
+    return {
+      apiBaseUrl: PREMIUM_SERVER_ORIGIN
+    };
+  }
+
+  function createInstallCode() {
+    return `bolha-${hashString(`${Date.now()}:${Math.random()}:${Math.random()}`)}`.slice(0, 24);
+  }
+
+  async function verifyEntitlementEnvelope(envelope, installCode) {
+    const normalizedEnvelope = sanitizeEntitlementEnvelope(envelope);
+
+    if (!normalizedEnvelope) {
+      return {
+        ok: false,
+        error: "Manjkajoča podpisana entitlement ovojnica."
+      };
+    }
+
+    const subtle = global.crypto && global.crypto.subtle;
+
+    if (!subtle) {
+      return {
+        ok: false,
+        error: "Kriptografska verifikacija v tem okolju ni na voljo."
+      };
+    }
+
+    const publicKey = await importEntitlementPublicKey(normalizedEnvelope.keyId);
+
+    if (!publicKey) {
+      return {
+        ok: false,
+        error: "Podpisni ključ za entitlement ni zaupan."
+      };
+    }
+
+    let signatureValid = false;
+
+    try {
+      signatureValid = await subtle.verify(
+        {
+          name: "ECDSA",
+          hash: "SHA-256"
+        },
+        publicKey,
+        derSignatureToRaw(base64ToUint8Array(normalizedEnvelope.signature)),
+        textToUint8Array(normalizedEnvelope.payload)
+      );
+    } catch (error) {
+      signatureValid = false;
+    }
+
+    if (!signatureValid) {
+      return {
+        ok: false,
+        error: "Entitlement podpis ni veljaven."
+      };
+    }
+
+    const payload = safeJsonParse(normalizedEnvelope.payload);
+
+    if (!payload || typeof payload !== "object") {
+      return {
+        ok: false,
+        error: "Entitlement payload ni veljaven JSON."
+      };
+    }
+
+    if (cleanText(payload.installCode) !== cleanText(installCode)) {
+      return {
+        ok: false,
+        error: "Entitlement ni vezan na to namestitev."
+      };
+    }
+
+    if (payload.status !== ENTITLEMENT_STATUS.PREMIUM_ACTIVE || payload.plan !== PLAN.PREMIUM_LIFETIME) {
+      return {
+        ok: false,
+        error: "Entitlement ne vsebuje aktivnega premium stanja."
+      };
+    }
+
+    if (!Number.isFinite(Number(payload.expiresAt)) || Number(payload.expiresAt) <= Date.now()) {
+      return {
+        ok: false,
+        error: "Entitlement je potekel in ga je treba ponovno osvežiti."
+      };
+    }
+
+    return {
+      ok: true,
+      payload
+    };
+  }
+
+  async function hydrateEntitlementState(rawEntitlement) {
+    const normalized = sanitizeEntitlement(rawEntitlement);
+
+    if (!normalized.installCode) {
+      normalized.installCode = createInstallCode();
+    }
+
+    if (!normalized.entitlementEnvelope) {
+      if (normalized.status === ENTITLEMENT_STATUS.PREMIUM_ACTIVE) {
+        normalized.status = ENTITLEMENT_STATUS.ENTITLEMENT_INVALID;
+        normalized.plan = PLAN.FREE;
+        normalized.lastError = normalized.lastError || "Premium stanje ni bilo podpisano in je bilo zavrnjeno.";
+      } else {
+        normalized.plan = getEntitlementPlanForStatus(normalized.status);
+      }
+
+      return normalized;
+    }
+
+    const verified = await verifyEntitlementEnvelope(normalized.entitlementEnvelope, normalized.installCode);
+
+    if (!verified.ok) {
+      normalized.entitlementEnvelope = null;
+      normalized.plan = PLAN.FREE;
+      normalized.status = normalized.status === ENTITLEMENT_STATUS.CHECKOUT_PENDING
+        ? ENTITLEMENT_STATUS.VERIFICATION_PENDING
+        : ENTITLEMENT_STATUS.ENTITLEMENT_INVALID;
+      normalized.lastError = verified.error;
+      normalized.premiumActivatedAt = null;
+      return normalized;
+    }
+
+    normalized.plan = PLAN.PREMIUM_LIFETIME;
+    normalized.status = ENTITLEMENT_STATUS.PREMIUM_ACTIVE;
+    normalized.lastVerifiedAt = Number(verified.payload.issuedAt) || normalized.lastVerifiedAt || Date.now();
+    normalized.paymentAcknowledgedAt = Number(verified.payload.issuedAt) || normalized.paymentAcknowledgedAt || Date.now();
+    normalized.premiumActivatedAt = Number(verified.payload.issuedAt) || normalized.premiumActivatedAt || Date.now();
+    normalized.checkoutSessionId = cleanText(verified.payload.checkoutSessionId) || normalized.checkoutSessionId;
+    normalized.restoreCode = cleanText(verified.payload.restoreCode).toUpperCase() || normalized.restoreCode;
+    normalized.maskedEmail = cleanText(verified.payload.maskedEmail) || normalized.maskedEmail;
+    normalized.lastError = null;
+    return normalized;
+  }
+
+  async function getBackendConfig() {
+    const stored = await chrome.storage.local.get(BACKEND_CONFIG_KEY);
+    return sanitizeBackendConfig(stored[BACKEND_CONFIG_KEY]);
+  }
+
+  async function saveBackendConfig(nextBackendConfig) {
+    const normalized = sanitizeBackendConfig(nextBackendConfig);
+    await chrome.storage.local.set({
+      [BACKEND_CONFIG_KEY]: normalized
+    });
+    return normalized;
+  }
+
+  async function getEntitlementState() {
+    const stored = await chrome.storage.local.get(ENTITLEMENT_KEY);
+    const hydrated = await hydrateEntitlementState(stored[ENTITLEMENT_KEY]);
+    await chrome.storage.local.set({
+      [ENTITLEMENT_KEY]: hydrated
+    });
+    return hydrated;
+  }
+
+  async function saveEntitlementState(nextEntitlement) {
+    const current = await getEntitlementState();
+    const normalized = sanitizeEntitlement({
+      ...current,
+      ...(nextEntitlement || {})
+    });
+
+    if (!normalized.installCode) {
+      normalized.installCode = current.installCode || createInstallCode();
+    }
+
+    await chrome.storage.local.set({
+      [ENTITLEMENT_KEY]: normalized
+    });
+
+    return normalized;
+  }
+
+  async function markCheckoutPending(checkoutSessionId, checkoutUrl, paymentSource) {
+    const now = Date.now();
+
+    return saveEntitlementState({
+      plan: PLAN.PAYMENT_PENDING,
+      status: ENTITLEMENT_STATUS.CHECKOUT_PENDING,
+      paymentSource: cleanText(paymentSource) || "stripe",
+      paymentStartedAt: now,
+      paymentAcknowledgedAt: null,
+      premiumActivatedAt: null,
+      checkoutSessionId: cleanText(checkoutSessionId) || null,
+      checkoutUrl: cleanText(checkoutUrl) || null,
+      entitlementEnvelope: null,
+      restoreCode: null,
+      maskedEmail: null,
+      lastSyncAttemptAt: now,
+      lastError: null
+    });
+  }
+
+  async function applyResolvedEntitlementResponse(response) {
+    const current = await getEntitlementState();
+    const normalizedResponse = response && typeof response === "object" ? response : {};
+    const nextStatus = Object.values(ENTITLEMENT_STATUS).includes(normalizedResponse.status)
+      ? normalizedResponse.status
+      : ENTITLEMENT_STATUS.ENTITLEMENT_INVALID;
+    const now = Date.now();
+    const patch = {
+      status: nextStatus,
+      plan: getEntitlementPlanForStatus(nextStatus),
+      checkoutSessionId: cleanText(normalizedResponse.checkoutSessionId) || current.checkoutSessionId || null,
+      maskedEmail: cleanText(normalizedResponse.maskedEmail) || current.maskedEmail || null,
+      restoreCode: cleanText(normalizedResponse.restoreCode).toUpperCase() || current.restoreCode || null,
+      lastSyncAttemptAt: now,
+      lastError: cleanText(normalizedResponse.failureReason) || null
+    };
+
+    if (nextStatus === ENTITLEMENT_STATUS.PREMIUM_ACTIVE && normalizedResponse.envelope) {
+      patch.plan = PLAN.PREMIUM_LIFETIME;
+      patch.entitlementEnvelope = sanitizeEntitlementEnvelope(normalizedResponse.envelope);
+      patch.lastVerifiedAt = now;
+      patch.paymentAcknowledgedAt = now;
+      patch.premiumActivatedAt = current.premiumActivatedAt || now;
+      patch.checkoutUrl = null;
+    }
+
+    if (
+      nextStatus === ENTITLEMENT_STATUS.FREE ||
+      nextStatus === ENTITLEMENT_STATUS.PAYMENT_FAILED ||
+      nextStatus === ENTITLEMENT_STATUS.PAYMENT_CANCELLED ||
+      nextStatus === ENTITLEMENT_STATUS.ENTITLEMENT_INVALID
+    ) {
+      patch.entitlementEnvelope = null;
+      patch.checkoutUrl = null;
+      patch.plan = PLAN.FREE;
+      patch.premiumActivatedAt = nextStatus === ENTITLEMENT_STATUS.FREE ? null : current.premiumActivatedAt;
+    }
+
+    if (nextStatus === ENTITLEMENT_STATUS.CHECKOUT_PENDING || nextStatus === ENTITLEMENT_STATUS.VERIFICATION_PENDING) {
+      patch.plan = PLAN.PAYMENT_PENDING;
+    }
+
+    const saved = await saveEntitlementState({
+      ...current,
+      ...patch
+    });
+
+    return getEntitlementState(saved);
+  }
+
+  function shouldRefreshEntitlement(entitlement, now = Date.now()) {
+    const normalized = sanitizeEntitlement(entitlement);
+
+    if (
+      normalized.status === ENTITLEMENT_STATUS.CHECKOUT_PENDING ||
+      normalized.status === ENTITLEMENT_STATUS.VERIFICATION_PENDING ||
+      normalized.status === ENTITLEMENT_STATUS.ENTITLEMENT_INVALID
+    ) {
+      return true;
+    }
+
+    if (!normalized.lastVerifiedAt) {
+      return true;
+    }
+
+    return now - normalized.lastVerifiedAt >= ENTITLEMENT_SYNC_INTERVAL_MS;
+  }
+
+  function isPremiumEntitled(entitlement) {
+    const normalized = sanitizeEntitlement(entitlement);
+    return normalized.plan === PLAN.PREMIUM_LIFETIME && normalized.status === ENTITLEMENT_STATUS.PREMIUM_ACTIVE;
+  }
+
+  function isPaymentPending(entitlement) {
+    const normalized = sanitizeEntitlement(entitlement);
+    return normalized.status === ENTITLEMENT_STATUS.CHECKOUT_PENDING || normalized.status === ENTITLEMENT_STATUS.VERIFICATION_PENDING;
+  }
+
+  function getPremiumCheckoutUrl() {
+    return null;
+  }
+
+  async function setEntitlementSyncError(errorMessage, statusOverride) {
+    const current = await getEntitlementState();
+    const nextStatus = Object.values(ENTITLEMENT_STATUS).includes(statusOverride)
+      ? statusOverride
+      : current.status === ENTITLEMENT_STATUS.CHECKOUT_PENDING
+        ? ENTITLEMENT_STATUS.VERIFICATION_PENDING
+        : current.status;
+
+    return saveEntitlementState({
+      ...current,
+      status: nextStatus,
+      plan: getEntitlementPlanForStatus(nextStatus),
+      lastSyncAttemptAt: Date.now(),
+      lastError: cleanText(errorMessage) || "Sinhronizacija premium stanja ni uspela."
+    });
+  }
+
+  function getTrackedListingsLimit(entitlement) {
+    return isPremiumEntitled(entitlement) ? Number.POSITIVE_INFINITY : FREE_LIMITS.trackedListings;
+  }
+
+  function getSavedViewsLimit(entitlement) {
+    return isPremiumEntitled(entitlement) ? MAX_SAVED_VIEWS : FREE_LIMITS.savedViews;
+  }
+
+  function getFeatureAvailability(feature, entitlement, context = {}) {
+    const trackedCount = Number(context.trackedCount) || 0;
+    const savedViewCount = Number(context.savedViewCount) || 0;
+
+    if (feature === PREMIUM_FEATURES.TRACKED_LISTINGS) {
+      const limit = getTrackedListingsLimit(entitlement);
+      return {
+        feature,
+        requiresPremium: !isPremiumEntitled(entitlement),
+        limit,
+        allowed: trackedCount < limit
+      };
+    }
+
+    if (feature === PREMIUM_FEATURES.SAVED_VIEWS) {
+      const limit = getSavedViewsLimit(entitlement);
+      return {
+        feature,
+        requiresPremium: !isPremiumEntitled(entitlement),
+        limit,
+        allowed: savedViewCount < limit
+      };
+    }
+
+    return {
+      feature,
+      requiresPremium: true,
+      limit: null,
+      allowed: isPremiumEntitled(entitlement)
+    };
+  }
+
+  function clampSettingsToEntitlement(rawSettings, entitlement) {
+    const normalized = sanitizeSettings(rawSettings);
+    return {
+      ...normalized,
+      savedViews: normalized.savedViews.slice(0, getSavedViewsLimit(entitlement))
+    };
+  }
+
   function sanitizeSettings(rawSettings) {
     const merged = {
       ...DEFAULT_SETTINGS,
@@ -616,7 +1292,7 @@
     return (Array.isArray(rawViews) ? rawViews : [])
       .map((view) => {
         const name = cleanText(view && view.name).slice(0, 32);
-        const query = cleanText(view && view.query).slice(0, 80);
+        const query = cleanText(view && view.query).slice(0, MAX_QUERY_LENGTH);
         const filter = validFilters.includes(view && view.filter) ? view.filter : "all";
         const sort = validSorts.includes(view && view.sort) ? view.sort : "recent";
 
@@ -649,7 +1325,7 @@
     return {
       id: getListingId(normalizedUrl),
       url: normalizedUrl,
-      title: cleanText(rawListing.title) || "Bolha oglas",
+      title: clampString(cleanText(rawListing.title) || "Bolha oglas", MAX_TITLE_LENGTH),
       price,
       priceText,
       currency,
@@ -665,6 +1341,7 @@
   }
 
   function extractListingFromHtml(source, pageUrl) {
+    source = sanitizeHtmlSource(source);
     const normalizedUrl = normalizeUrl(pageUrl);
     const product = extractJsonLdProductFromHtml(source);
     const summary = extractBootValues(source, BOLHA_PAGE_CONFIG.bootPayloads.summary);
@@ -741,7 +1418,10 @@
 
   function extractListingFromDocument(documentRef, pageUrl) {
     const normalizedUrl = normalizeUrl(pageUrl || (global.location && global.location.href));
-    const htmlFallback = extractListingFromHtml(documentRef.documentElement.outerHTML, normalizedUrl);
+    const htmlFallback = extractListingFromHtml(
+      sanitizeHtmlSource(documentRef && documentRef.documentElement ? documentRef.documentElement.outerHTML : ""),
+      normalizedUrl
+    );
     const category = getCategoryFromDocument(documentRef);
     const title = getFirstText(documentRef, BOLHA_PAGE_CONFIG.selectors.title);
     const priceText = getFirstText(documentRef, BOLHA_PAGE_CONFIG.selectors.price);
@@ -872,7 +1552,7 @@
       hasUnseenDrop: Boolean(rawItem && rawItem.hasUnseenDrop),
       dropDetectedAt: Number(rawItem && rawItem.dropDetectedAt) || null,
       lastViewedDropAt: Number(rawItem && rawItem.lastViewedDropAt) || null,
-      notes: cleanText(rawItem && rawItem.notes),
+      notes: clampString(cleanText(rawItem && rawItem.notes), MAX_NOTES_LENGTH),
       tags: normalizeTags(rawItem && rawItem.tags),
       sellerAlertEnabled: Boolean(rawItem && rawItem.sellerAlertEnabled),
       nextCheckAt: Number(rawItem && rawItem.nextCheckAt) || null,
@@ -1209,6 +1889,12 @@
   }
 
   function normalizeImportPayload(payload) {
+    const serialized = JSON.stringify(payload == null ? null : payload);
+
+    if (serialized && serialized.length > MAX_IMPORT_SIZE_BYTES) {
+      throw new Error("Uvoz je prevelik za varno obdelavo v razširitvi.");
+    }
+
     if (Array.isArray(payload)) {
       return {
         items: payload.map(normalizeStoredListing),
@@ -1376,16 +2062,30 @@
   }
 
   const DONATION_URL = getPreferredDonationLink();
+  const PREMIUM_LIFETIME_URL = getPremiumCheckoutUrl();
 
   global.BolhaTrackerUtils = {
     STORAGE_KEY,
     SETTINGS_KEY,
+    ENTITLEMENT_KEY,
+    BACKEND_CONFIG_KEY,
     EXPORT_VERSION,
     HISTORY_LIMIT,
     MAX_SAVED_VIEWS,
+    MAX_IMPORT_SIZE_BYTES,
     ALARM_NAME,
     DONATION_URLS,
     DONATION_URL,
+    PREMIUM_LIFETIME_PRICE,
+    PREMIUM_LIFETIME_CURRENCY,
+    PREMIUM_SERVER_ORIGIN,
+    ENTITLEMENT_KEY_ID,
+    ENTITLEMENT_SYNC_INTERVAL_MS,
+    PREMIUM_LIFETIME_URL,
+    PLAN,
+    ENTITLEMENT_STATUS,
+    PREMIUM_FEATURES,
+    FREE_LIMITS,
     STATUS,
     STATUS_META,
     DEFAULT_SETTINGS,
@@ -1394,6 +2094,9 @@
     MESSAGE_TYPES,
     cleanText,
     safeJsonParse,
+    clampString,
+    isSafeWebUrl,
+    sanitizeHtmlSource,
     normalizeUrl,
     isBolhaUrl,
     isLikelyListingUrl,
@@ -1405,6 +2108,26 @@
     buildPayPalMeLink,
     getPreferredDonationLink,
     getListingId,
+    sanitizeEntitlementEnvelope,
+    sanitizeEntitlement,
+    sanitizeBackendConfig,
+    verifyEntitlementEnvelope,
+    hydrateEntitlementState,
+    getBackendConfig,
+    saveBackendConfig,
+    getEntitlementState,
+    saveEntitlementState,
+    markCheckoutPending,
+    applyResolvedEntitlementResponse,
+    shouldRefreshEntitlement,
+    setEntitlementSyncError,
+    isPremiumEntitled,
+    isPaymentPending,
+    getPremiumCheckoutUrl,
+    getTrackedListingsLimit,
+    getSavedViewsLimit,
+    getFeatureAvailability,
+    clampSettingsToEntitlement,
     sanitizeSettings,
     getSettings,
     saveSettings,

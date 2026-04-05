@@ -5,17 +5,26 @@
     MESSAGE_TYPES,
     STATUS_META,
     DONATION_URL,
+    ENTITLEMENT_KEY,
+    PREMIUM_FEATURES,
+    PLAN,
+    getEntitlementState,
+    getFeatureAvailability,
+    isSafeWebUrl,
+    isPremiumEntitled,
     isLikelyListingUrl,
     isBolhaUrl,
     extractListingFromDocument,
     buildSparklinePath,
     getPriceSeries,
     formatCurrency,
-    findTrackedListingByUrl
+    findTrackedListingByUrl,
+    getTrackedListings
   } = globalThis.BolhaTrackerUtils;
 
   const {
     getMessage,
+    getEntitlementCopy,
     resolveLocale,
     getStatusShortLabel,
     formatRelativeTime,
@@ -34,9 +43,11 @@
 
   const state = {
     locale: 'auto',
-    theme: 'dark',
+    theme: 'light',
+    entitlement: { plan: PLAN.FREE },
     listing: null,
     trackedItem: null,
+    trackedCount: 0,
     loading: true,
     minimized: false,
     refreshing: false,
@@ -47,12 +58,24 @@
   let noticeTimer = null;
 
   function applyTheme(theme) {
-    state.theme = theme || 'dark';
+    state.theme = theme || 'light';
     host.setAttribute('data-theme', state.theme);
+  }
+
+  async function loadEntitlement() {
+    state.entitlement = await getEntitlementState();
   }
 
   function t(key, subs) {
     return getMessage(key, resolveLocale(state.locale), subs);
+  }
+
+  function hasPremium() {
+    return isPremiumEntitled(state.entitlement);
+  }
+
+  function featureAccess(feature, context) {
+    return getFeatureAvailability(feature, state.entitlement, context);
   }
 
   function esc(val) {
@@ -79,6 +102,13 @@
       render();
       rebindDrag();
     }, 2200);
+  }
+
+  async function openDashboardPage() {
+    await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.OPEN_EXTENSION_PAGE,
+      payload: { page: 'popup' }
+    });
   }
 
   // ── Saved position/size ────────────────────────────────────────────────────
@@ -182,10 +212,19 @@
           <div class="skel-line w45"></div>
         </div>`;
     } else if (!listing || !listing.isListing) {
-      bodyHtml = `<div class="p-empty">Tega oglasa na Bolhi ni mogoče spremljati.</div>`;
+      bodyHtml = `
+        <div class="p-body">
+          <div class="p-empty">Tega oglasa na Bolhi ni mogoče spremljati.</div>
+          <div class="p-actions">
+            <button class="btn btn-ghost" data-action="open-dashboard">${esc(t('openDashboardPage'))}</button>
+          </div>
+        </div>`;
     } else {
       const unavailable = listing.available === false;
       const isTracked = Boolean(tracked);
+      const trackedAccess = featureAccess(PREMIUM_FEATURES.TRACKED_LISTINGS, {
+        trackedCount: state.trackedCount
+      });
       const priceText = unavailable
         ? t('listingUnavailable')
         : (listing.priceText || formatCurrency(listing.currentPrice, listing.currency));
@@ -193,6 +232,7 @@
       const status = isTracked ? tracked.status : (unavailable ? 'unavailable' : 'unchanged');
       const tone = (STATUS_META[status] || { tone: 'unchanged' }).tone;
       const statusLabel = getStatusShortLabel(status, resolveLocale(state.locale));
+      const premiumCopy = getEntitlementCopy(state.entitlement, resolveLocale(state.locale));
 
       // Thumbnail
       const thumbHtml = listing.imageUrl
@@ -228,15 +268,23 @@
             ${refreshing ? 'Osvežujem ...' : 'Osveži'}
           </button>
           <button class="btn btn-danger" data-action="remove">Odstrani</button>
-          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>`;
+          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>
+          <button class="btn btn-ghost" data-action="open-dashboard">${esc(t('openDashboardPage'))}</button>`;
       } else if (unavailable) {
         actionsHtml = `
           <button class="btn btn-secondary" disabled>Ni na voljo</button>
-          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>`;
+          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>
+          <button class="btn btn-ghost" data-action="open-dashboard">${esc(t('openDashboardPage'))}</button>`;
+      } else if (!trackedAccess.allowed) {
+        actionsHtml = `
+          <button class="btn btn-primary" data-action="upgrade">${esc(t('premiumLockedTrackButton'))}</button>
+          <button class="btn btn-ghost" data-action="open-dashboard">${esc(t('openDashboardPage'))}</button>
+          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri â†—</a>`;
       } else {
         actionsHtml = `
           <button class="btn btn-primary" data-action="track">Spremljaj ceno</button>
-          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>`;
+          <a class="btn btn-ghost" href="${esc(listing.url)}" target="_blank" rel="noreferrer">Odpri ↗</a>
+          <button class="btn btn-ghost" data-action="open-dashboard">${esc(t('openDashboardPage'))}</button>`;
       }
 
       bodyHtml = `
@@ -251,6 +299,7 @@
               <div class="p-price">${esc(priceText)}</div>
               ${delta ? `<div class="p-delta d-${esc(tone)}">${esc(delta)}</div>` : ''}
               ${lastCheck ? `<div class="p-meta">${esc(lastCheck)}</div>` : ''}
+              ${!trackedAccess.allowed ? `<div class="p-meta">${esc(premiumCopy)}</div>` : ''}
             </div>
           </div>
           ${sparkHtml}
@@ -276,7 +325,7 @@
       <div class="panel${minimized ? ' is-minimized' : ''}${panelH !== null ? ' has-height' : ''}">
         <div class="p-header" data-drag>
           <div class="p-header-left">
-            <span class="p-logo">B</span>
+            <span class="p-logo" aria-hidden="true"></span>
             <span class="p-brand">Bolha Sledilnik</span>
           </div>
           <div class="p-header-right">
@@ -333,7 +382,7 @@
       }
 
       case 'theme': {
-        const next = state.theme === 'dark' ? 'light' : 'dark';
+      const next = state.theme === 'dark' ? 'light' : 'dark';
         await chrome.storage.local.set({ [THEME_KEY]: next });
         applyTheme(next);
         render();
@@ -342,7 +391,7 @@
       }
 
       case 'donate': {
-        if (DONATION_URL) {
+        if (DONATION_URL && isSafeWebUrl(DONATION_URL, { httpsOnly: true, allowHosts: ['paypal.me', 'www.paypal.me'] })) {
           window.open(DONATION_URL, '_blank', 'noopener,noreferrer');
         }
         break;
@@ -356,8 +405,27 @@
         });
         if (resp && resp.ok) {
           await reloadTracked();
+          state.trackedCount = (await getTrackedListings()).length;
           render();
           rebindDrag();
+        } else if (resp && resp.requiresPremium) {
+          showNotice(resp.error || t('premiumLockedFeature'));
+        }
+        break;
+      }
+
+      case 'upgrade': {
+        const resp = await chrome.runtime.sendMessage({
+          type: MESSAGE_TYPES.CREATE_CHECKOUT_SESSION
+        });
+
+        if (resp && resp.ok) {
+          state.entitlement = resp.entitlement || await getEntitlementState();
+          render();
+          rebindDrag();
+          showNotice(t('premiumPendingToast'));
+        } else {
+          showNotice((resp && resp.error) || t('premiumLockedFeature'));
         }
         break;
       }
@@ -392,12 +460,19 @@
         rebindDrag();
         break;
       }
+
+      case 'open-dashboard': {
+        await openDashboardPage();
+        break;
+      }
     }
   }
 
   async function reloadTracked() {
+    const items = await getTrackedListings();
+    state.trackedCount = items.length;
     state.trackedItem = (state.listing && state.listing.url)
-      ? await findTrackedListingByUrl(state.listing.url)
+      ? items.find((item) => item.url === state.listing.url) || null
       : null;
   }
 
@@ -530,14 +605,26 @@
     // Load theme
     try {
       const stored = await chrome.storage.local.get(THEME_KEY);
-      applyTheme(stored[THEME_KEY] || 'dark');
-    } catch { applyTheme('dark'); }
+      applyTheme(stored[THEME_KEY] || 'light');
+    } catch { applyTheme('light'); }
+
+    await loadEntitlement();
 
     // Load settings for locale
     try {
       const resp = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_SETTINGS });
       if (resp && resp.ok) state.locale = resp.settings.locale || 'auto';
     } catch { /* service worker may be inactive, continue */ }
+
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        type: MESSAGE_TYPES.SYNC_ENTITLEMENT,
+        payload: { force: false }
+      });
+      if (resp && resp.entitlement) {
+        state.entitlement = resp.entitlement;
+      }
+    } catch {}
 
     // Extract listing from current DOM
     try {
@@ -561,9 +648,12 @@
         reloadTracked().then(() => { render(); rebindDrag(); });
       }
       if (changes[THEME_KEY]) {
-        applyTheme(changes[THEME_KEY].newValue || 'dark');
+        applyTheme(changes[THEME_KEY].newValue || 'light');
         render();
         rebindDrag();
+      }
+      if (changes[ENTITLEMENT_KEY]) {
+        loadEntitlement().then(() => { render(); rebindDrag(); });
       }
     });
   }

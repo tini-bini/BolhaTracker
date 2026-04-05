@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import py_compile
 import re
 from pathlib import Path
 
@@ -16,7 +15,7 @@ def ensure_no_trailing_whitespace() -> None:
     for path in ROOT.rglob("*"):
         if not path.is_file() or path.suffix.lower() not in TEXT_EXTENSIONS:
             continue
-        if any(part.startswith(".git") or part in {"dist", ".tools", "__pycache__"} for part in path.parts):
+        if any(part.startswith(".git") or part in {"dist", ".tools", "__pycache__", "node_modules", "test-results", "playwright-report"} for part in path.parts):
             continue
 
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
@@ -34,7 +33,8 @@ def ensure_manifest_is_valid() -> None:
 
 def ensure_python_syntax() -> None:
     for path in sorted((ROOT / "scripts").glob("*.py")):
-        py_compile.compile(str(path), doraise=True)
+        source = path.read_text(encoding="utf-8")
+        compile(source, str(path), "exec")
 
 
 def ensure_js_syntax() -> None:

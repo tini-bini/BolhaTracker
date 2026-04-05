@@ -17,6 +17,13 @@ def get_node_command() -> list[str]:
     return ["node"]
 
 
+def get_npm_command() -> list[str]:
+    if sys.platform.startswith("win"):
+        return ["npm.cmd"]
+
+    return ["npm"]
+
+
 def run(command: list[str], label: str) -> None:
     completed = subprocess.run(command, cwd=ROOT, check=False)
     if completed.returncode != 0:

@@ -1,6 +1,6 @@
 # Pravilnik o zasebnosti
 
-Zadnja posodobitev: 30. marec 2026
+Zadnja posodobitev: 5. april 2026
 
 ## BOLHA Sledilnik cen
 
@@ -31,6 +31,14 @@ Razširitev podatke praviloma shranjuje lokalno v brskalniku uporabnika z uporab
 
 Če uporabnik uporabi izbirno funkcijo varnostne kopije v Chrome Sync, se lahko izvoženi podatki seznama spremljanja shranijo v sinhronizirano shrambo istega prijavljenega Chrome profila.
 
+Če uporabnik začne premium checkout ali obnovo dostopa, razširitev lahko z razvojnim oziroma produkcijskim payment backendom izmenja omejen nabor podatkov, potrebnih za preverjanje plačila in licence:
+
+- kodo namestitve razširitve
+- izbrani premium plan
+- status checkout seje
+- e-pošto nakupa in obnovitveno kodo, kadar uporabnik izrecno izvede obnovo dostopa
+- podpisan entitlement odgovor, ki potrdi premium stanje za to napravo
+
 ## Česa razširitev ne počne
 
 Razširitev:
@@ -47,7 +55,7 @@ Razširitev ne uporablja oddaljene kode. Vsa JavaScript koda, potrebna za delova
 
 ## Deljenje podatkov
 
-Podatki se ne delijo z zunanjimi strežniki razvijalca, razen če uporabnik sam uporabi povezavo do zunanje storitve, kot je PayPal.Me za podporo projektu. Tak klik je prostovoljen in ni del zbiranja podatkov za delovanje razširitve.
+Osnovni podatki seznama spremljanja se ne delijo z zunanjimi strežniki razvijalca. Izjema je premium checkout oziroma obnova dostopa, kjer se z backendom izmenjajo le podatki, potrebni za ustvarjanje checkout seje, potrditev plačila, podpis premium entitlementa in obnovo dostopa na novi napravi. Donacijska povezava PayPal.Me ostaja ločen, prostovoljen klik in ni del osnovnega delovanja razširitve.
 
 ## Hramba podatkov
 

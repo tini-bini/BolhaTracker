@@ -1,6 +1,6 @@
 # BOLHA Sledilnik cen
 
-Produkcijsko pripravljena razširitev Chrome MV3 za lokalno spremljanje cen oglasov na Bolhi, pregled trendov na seznamu spremljanja in prejemanje obvestil o padcih cen brez pošiljanja uporabniških podatkov v zaledni sistem.
+Produkcijsko pripravljena razširitev Chrome MV3 za lokalno spremljanje cen oglasov na Bolhi, pregled trendov na seznamu spremljanja in prejemanje obvestil o padcih cen. Jedrni watchlist ostane lokalen, premium dostop pa uporablja strežniško preverjene entitemente in obnovo licence brez računa.
 
 ## Povzetek izdelka
 
@@ -14,15 +14,16 @@ Produkcijsko pripravljena razširitev Chrome MV3 za lokalno spremljanje cen ogla
 
 ## Povzetek arhitekture
 
-- `utils.js`: skupna domenska logika, normalizacija shrambe, varnost povezav PayPal, filtriranje, razvrščanje, analitika ter uvoz/izvoz
+- `utils.js`: skupna domenska logika, normalizacija shrambe, podpisani entitlement cache, filtriranje, razvrščanje, analitika ter uvoz/izvoz
 - `service-worker.js`: orkestracija v ozadju, načrtovano osveževanje, obvestila, varnostne kopije in obdelava izvajalnih sporočil
 - `content.js`: most za izluščenje oglasa iz aktivnega zavihka
 - `panel.js` + `panel.css`: vbrizgana plošča sledilnika na strani oglasa
 - `popup.html` + `popup.js` + `popup.css`: glavno upravljalno središče seznama spremljanja
 - `options.html` + `options.js` + `options.css`: nadzorna plošča za diagnostiko, kopije, poglede in analitiko
 - `i18n.js`: lokalizirana besedila in pomočniki za oblikovanje uporabniških nizov
+- `server/`: Express + SQLite zaledje za checkout, webhook/idempotency, signed entitlements in restore flow
 - `scripts/`: orodja za validacijo izdaje, lint, preverjanje tipov in pakiranje
-- `tests/`: avtomatizirani testi kritičnih poti
+- `tests/`: unit, smoke in Playwright E2E testi kritičnih poti
 
 ## Lokalni razvoj
 
@@ -32,7 +33,11 @@ Produkcijsko pripravljena razširitev Chrome MV3 za lokalno spremljanje cen ogla
 4. Kliknite `Load unpacked`.
 5. Izberite korensko mapo repozitorija.
 
-Za trenutno lokalno izdajo niso potrebne nobene okoljske spremenljivke.
+Za lokalni premium/mock checkout tok:
+
+1. Zaženite `npm install`.
+2. Za razvojni payment backend zaženite `npm run server:start`.
+3. Po potrebi nastavite `BOLHA_PAYMENT_PROVIDER=stripe` ter Stripe okoljske spremenljivke za pravi checkout.
 
 ## Orodja za izdajo
 
@@ -40,31 +45,42 @@ Repo vsebuje samostojne skripte za validacijo in pakiranje, ki uporabljajo Pytho
 
 - Lint: `python scripts/lint.py`
 - Preverjanje tipov: `python scripts/typecheck.py`
-- Testi: `.\.tools\node-v22.15.0-win-x64\node.exe --test tests\utils.test.js`
+- Unit testi: `npm run test:unit`
+- Smoke testi: `npm run test:smoke`
+- Playwright E2E: `npm run test:e2e`
 - Izdelava ZIP paketa izdaje: `python scripts/build_release.py`
 - Celovita validacija izdaje: `python scripts/validate_release.py`
+
+Produkcijski extension build:
+
+- nastavite `BOLHA_RELEASE_CHANNEL=production`
+- nastavite `BOLHA_EXTENSION_API_ORIGIN=https://vas-backend.example`
+- zaženite `python scripts/build_release.py`
+
+Razvojni build ostane privzeto vezan na localhost in se shrani kot `-dev` artefakt.
 
 ## Pokritost preverjanja
 
 - Preverjanje sintakse JavaScript za vsako vključeno datoteko `.js`
 - Pokritost pogodb sporočil med `utils.js` in `service-worker.js`
 - Preverjanje ujemanja DOM ID-jev za pojavno okno in nastavitve
-- Pokritost pomožnih funkcij za validacijo PayPal.Me
+- Pokritost signed entitlement verifikacije, restore tokov in webhook/idempotency pravil
 - Ključni logični testi za:
-  - validacijo in sestavljanje povezav PayPal.Me
+  - validacijo podpornih PayPal.Me povezav za donacije
+  - signed premium entitlement cache in varne downgrade poti
+  - restore licence, checkout idempotency in max-install omejitve
   - normalizacijo shranjenih pogledov
   - filtriranje seznama spremljanja
   - izračune cenovne analitike
 
-## Ravnanje s PayPal.Me
+## Premium in plačila
 
-- Povezave za podporo se pred uporabo preverijo.
-- Sprejete so le povezave `https://paypal.me/...` ali `https://www.paypal.me/...`.
-- Povezave s parametri, fragmenti, napačnimi gostitelji ali nepravilnimi uporabniškimi imeni se zavrnejo.
-- Gumbi za podporo v pojavnem oknu in nastavitvah so onemogočeni, če ni veljavne povezave.
-- Trenutno nastavljena povezava za podporo: `https://paypal.me/TiniFlegar`
+- Premium checkout ustvari backend in se potrdi šele po strežniško verificiranem rezultatu.
+- Razširitev lokalno hrani le podpisan entitlement cache, ne pa surovega premium flag-a brez verifikacije.
+- Restore dostopa deluje brez računa: uporabnik vnese e-pošto nakupa in obnovitveno kodo.
+- Donacije ostanejo ločene od premium unlock toka in še vedno uporabljajo preverjene PayPal.Me povezave.
 
-Ročno preverjanje plačila še vedno zahteva sejo brskalnika in razpoložljivost PayPala. Repo implementira generiranje povezav in navigacijske poti, ne vsebuje pa poverilnic računa PayPal ali avtomatizacije dejanskega plačila.
+Ročno ali avtomatizirano preverjanje plačil v razvoju uporablja lokalni mock checkout. Za pravi Stripe tok je treba nastaviti produkcijske okoljske spremenljivke in backend URL.
 
 ## Varnostna kopija v oblaku
 
@@ -75,9 +91,10 @@ Ročno preverjanje plačila še vedno zahteva sejo brskalnika in razpoložljivos
 ## Koraki izdaje
 
 1. Zaženite `python scripts/validate_release.py`.
-2. Potrdite pot do artefakta, ki jo izpiše `build_release.py`.
-3. Odprite ZIP paket v `dist/`.
-4. Ročno naložite ZIP v Chrome Web Store Developer Dashboard.
+2. Za javni release nastavite `BOLHA_RELEASE_CHANNEL=production` in `BOLHA_EXTENSION_API_ORIGIN=https://vas-backend.example`, nato ponovno zaženite `python scripts/build_release.py`.
+3. Potrdite pot do artefakta, ki jo izpiše `build_release.py`.
+4. Odprite ZIP paket v `dist/`.
+5. Ročno naložite ZIP v Chrome Web Store Developer Dashboard.
 
 ## Ročni kontrolni seznam za nalaganje v Chrome Web Store
 

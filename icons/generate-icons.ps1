@@ -83,17 +83,15 @@ function Draw-Icon {
   $bitmap = [System.Drawing.Bitmap]::new($Size, $Size)
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 
-  $charcoalTop = [System.Drawing.Color]::FromArgb(255, 50, 53, 58)
-  $charcoalBottom = [System.Drawing.Color]::FromArgb(255, 27, 30, 34)
-  $charcoalDeep = [System.Drawing.Color]::FromArgb(255, 18, 20, 24)
-  $sage = [System.Drawing.Color]::FromArgb(255, 117, 177, 131)
-  $sageSoft = [System.Drawing.Color]::FromArgb(170, 196, 238, 206)
-  $sageGlow = [System.Drawing.Color]::FromArgb(105, 117, 177, 131)
-  $mintWhite = [System.Drawing.Color]::FromArgb(220, 237, 247, 240)
-  $frost = [System.Drawing.Color]::FromArgb(124, 240, 248, 244)
-  $frostEdge = [System.Drawing.Color]::FromArgb(145, 255, 255, 255)
-  $tileEdge = [System.Drawing.Color]::FromArgb(40, 255, 255, 255)
-  $shadow = [System.Drawing.Color]::FromArgb(90, 0, 0, 0)
+  $brandInkTop = [System.Drawing.Color]::FromArgb(255, 60, 73, 81)
+  $brandInkBottom = [System.Drawing.Color]::FromArgb(255, 45, 57, 64)
+  $brandCyan = [System.Drawing.Color]::FromArgb(255, 22, 167, 220)
+  $brandGreen = [System.Drawing.Color]::FromArgb(255, 143, 198, 66)
+  $brandYellow = [System.Drawing.Color]::FromArgb(255, 246, 197, 47)
+  $brandPink = [System.Drawing.Color]::FromArgb(255, 239, 10, 135)
+  $lineColor = [System.Drawing.Color]::FromArgb(255, 248, 251, 252)
+  $borderColor = [System.Drawing.Color]::FromArgb(30, 255, 255, 255)
+  $shadowColor = [System.Drawing.Color]::FromArgb(56, 28, 36, 42)
 
   try {
     $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
@@ -102,23 +100,24 @@ function Draw-Icon {
     $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
     $graphics.Clear([System.Drawing.Color]::Transparent)
 
-    $pad = [Math]::Max(1.0, $Size * 0.085)
+    $pad = [Math]::Max(1.0, $Size * 0.09)
     $tileSize = $Size - ($pad * 2)
     $radius = $tileSize * 0.28
+    $stripeHeight = [Math]::Max(1.5, $tileSize * 0.075)
 
-    $shadowBrush = [System.Drawing.SolidBrush]::new($shadow)
+    $shadowBrush = [System.Drawing.SolidBrush]::new($shadowColor)
     try {
-      Fill-RoundedRect -Graphics $graphics -Brush $shadowBrush -X ($pad + ($Size * 0.01)) -Y ($pad + ($Size * 0.035)) -Width $tileSize -Height $tileSize -Radius $radius
+      Fill-RoundedRect -Graphics $graphics -Brush $shadowBrush -X ($pad + ($Size * 0.006)) -Y ($pad + ($Size * 0.024)) -Width $tileSize -Height $tileSize -Radius $radius
     }
     finally {
       $shadowBrush.Dispose()
     }
 
     $tileBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
-      (New-Point ($pad + $tileSize * 0.15) $pad),
-      (New-Point ($pad + $tileSize * 0.85) ($pad + $tileSize)),
-      $charcoalTop,
-      $charcoalBottom
+      (New-Point ($pad + $tileSize * 0.5) $pad),
+      (New-Point ($pad + $tileSize * 0.5) ($pad + $tileSize)),
+      $brandInkTop,
+      $brandInkBottom
     )
     try {
       Fill-RoundedRect -Graphics $graphics -Brush $tileBrush -X $pad -Y $pad -Width $tileSize -Height $tileSize -Radius $radius
@@ -131,47 +130,22 @@ function Draw-Icon {
     try {
       $graphics.SetClip($clipPath)
 
-      $panelGlow = [System.Drawing.Drawing2D.PathGradientBrush]::new([System.Drawing.PointF[]] @(
-        (New-Point ($pad + $tileSize * 0.18) ($pad + $tileSize * 0.08)),
-        (New-Point ($pad + $tileSize * 0.86) ($pad + $tileSize * 0.15)),
-        (New-Point ($pad + $tileSize * 0.68) ($pad + $tileSize * 0.64)),
-        (New-Point ($pad + $tileSize * 0.22) ($pad + $tileSize * 0.56))
-      ))
-      try {
-        $panelGlow.CenterColor = [System.Drawing.Color]::FromArgb(38, 255, 255, 255)
-        $panelGlow.SurroundColors = @([System.Drawing.Color]::Transparent)
-        $graphics.FillEllipse($panelGlow, $pad + $tileSize * 0.02, $pad - $tileSize * 0.02, $tileSize * 0.96, $tileSize * 0.62)
-      }
-      finally {
-        $panelGlow.Dispose()
-      }
-
-      $greenGlow = [System.Drawing.Drawing2D.PathGradientBrush]::new([System.Drawing.PointF[]] @(
-        (New-Point ($pad + $tileSize * 0.20) ($pad + $tileSize * 0.38)),
-        (New-Point ($pad + $tileSize * 0.78) ($pad + $tileSize * 0.20)),
-        (New-Point ($pad + $tileSize * 0.78) ($pad + $tileSize * 0.74)),
-        (New-Point ($pad + $tileSize * 0.28) ($pad + $tileSize * 0.82))
-      ))
-      try {
-        $greenGlow.CenterColor = $sageGlow
-        $greenGlow.SurroundColors = @([System.Drawing.Color]::Transparent)
-        $graphics.FillEllipse($greenGlow, $pad + $tileSize * 0.12, $pad + $tileSize * 0.18, $tileSize * 0.72, $tileSize * 0.68)
-      }
-      finally {
-        $greenGlow.Dispose()
-      }
-
-      $causticBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
-        (New-Point $pad ($pad + $tileSize * 0.22)),
-        (New-Point ($pad + $tileSize) ($pad + $tileSize * 0.48)),
-        [System.Drawing.Color]::FromArgb(44, 255, 255, 255),
-        [System.Drawing.Color]::FromArgb(0, 255, 255, 255)
+      $segmentWidth = $tileSize / 4
+      $segmentSpecs = @(
+        @{ X = $pad; Color = $brandCyan },
+        @{ X = $pad + $segmentWidth; Color = $brandGreen },
+        @{ X = $pad + ($segmentWidth * 2); Color = $brandYellow },
+        @{ X = $pad + ($segmentWidth * 3); Color = $brandPink }
       )
-      try {
-        $graphics.FillEllipse($causticBrush, $pad - $tileSize * 0.05, $pad + $tileSize * 0.04, $tileSize * 0.90, $tileSize * 0.34)
-      }
-      finally {
-        $causticBrush.Dispose()
+
+      foreach ($segment in $segmentSpecs) {
+        $segmentBrush = [System.Drawing.SolidBrush]::new($segment.Color)
+        try {
+          $graphics.FillRectangle($segmentBrush, $segment.X, $pad, $segmentWidth + 1, $stripeHeight)
+        }
+        finally {
+          $segmentBrush.Dispose()
+        }
       }
 
       $graphics.ResetClip()
@@ -180,146 +154,70 @@ function Draw-Icon {
       $clipPath.Dispose()
     }
 
-    $tilePen = [System.Drawing.Pen]::new($tileEdge, [Math]::Max(1.0, $Size * 0.012))
+    $borderPen = [System.Drawing.Pen]::new($borderColor, [Math]::Max(1.0, $tileSize * 0.012))
     try {
-      Draw-RoundedRect -Graphics $graphics -Pen $tilePen -X ($pad + 0.5) -Y ($pad + 0.5) -Width ($tileSize - 1.0) -Height ($tileSize - 1.0) -Radius ($radius * 0.98)
+      Draw-RoundedRect -Graphics $graphics -Pen $borderPen -X ($pad + 0.5) -Y ($pad + 0.5) -Width ($tileSize - 1) -Height ($tileSize - 1) -Radius ($radius * 0.98)
     }
     finally {
-      $tilePen.Dispose()
+      $borderPen.Dispose()
     }
 
-    $glassPenWidth = [Math]::Max(2.0, $tileSize * 0.16)
-    $innerPenWidth = [Math]::Max(1.2, $tileSize * 0.082)
-    $points = [System.Drawing.PointF[]] @(
-      (New-Point ($pad + $tileSize * 0.28) ($pad + $tileSize * 0.67)),
-      (New-Point ($pad + $tileSize * 0.43) ($pad + $tileSize * 0.55)),
-      (New-Point ($pad + $tileSize * 0.56) ($pad + $tileSize * 0.42)),
-      (New-Point ($pad + $tileSize * 0.70) ($pad + $tileSize * 0.30))
+    $linePoints = [System.Drawing.PointF[]] @(
+      (New-Point ($pad + $tileSize * 0.27) ($pad + $tileSize * 0.68)),
+      (New-Point ($pad + $tileSize * 0.43) ($pad + $tileSize * 0.56)),
+      (New-Point ($pad + $tileSize * 0.57) ($pad + $tileSize * 0.45)),
+      (New-Point ($pad + $tileSize * 0.71) ($pad + $tileSize * 0.33))
     )
 
-    $glassStroke = [System.Drawing.Drawing2D.GraphicsPath]::new()
-    $glassStroke.AddLines($points)
-
-    try {
-      $shadowGlassPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(32, 0, 0, 0), $glassPenWidth + ($tileSize * 0.02))
-      $shadowGlassPen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
-      $shadowGlassPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-      $shadowGlassPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-      $shadowMatrix = [System.Drawing.Drawing2D.Matrix]::new()
-      $shadowMatrix.Translate($Size * 0.01, $Size * 0.016)
-      $shadowCopy = $glassStroke.Clone()
-      $shadowCopy.Transform($shadowMatrix)
-      try {
-        $graphics.DrawPath($shadowGlassPen, $shadowCopy)
-      }
-      finally {
-        $shadowCopy.Dispose()
-        $shadowMatrix.Dispose()
-        $shadowGlassPen.Dispose()
-      }
-
-      $glassPen = [System.Drawing.Pen]::new($frost, $glassPenWidth)
-      $glassPen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
-      $glassPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-      $glassPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-      try {
-        $graphics.DrawPath($glassPen, $glassStroke)
-      }
-      finally {
-        $glassPen.Dispose()
-      }
-
-      $innerPen = [System.Drawing.Pen]::new($mintWhite, $innerPenWidth)
-      $innerPen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
-      $innerPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-      $innerPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-      try {
-        $graphics.DrawPath($innerPen, $glassStroke)
-      }
-      finally {
-        $innerPen.Dispose()
-      }
-    }
-    finally {
-      $glassStroke.Dispose()
-    }
-
-    $barX = $pad + $tileSize * 0.22
-    $barY = $pad + $tileSize * 0.31
-    $barW = [Math]::Max(2.0, $tileSize * 0.11)
-    $barH = $tileSize * 0.43
-    $barBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
-      (New-Point $barX $barY),
-      (New-Point $barX ($barY + $barH)),
-      [System.Drawing.Color]::FromArgb(124, 248, 252, 250),
-      [System.Drawing.Color]::FromArgb(90, 212, 239, 219)
-    )
-    try {
-      Fill-RoundedRect -Graphics $graphics -Brush $barBrush -X $barX -Y $barY -Width $barW -Height $barH -Radius ($barW / 2)
-    }
-    finally {
-      $barBrush.Dispose()
-    }
-
-    $smallNodeRadius = [Math]::Max(1.2, $tileSize * 0.052)
-    $nodeBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(116, 248, 252, 249))
-    try {
-      foreach ($point in $points[0..2]) {
-        $graphics.FillEllipse($nodeBrush, $point.X - $smallNodeRadius, $point.Y - $smallNodeRadius, $smallNodeRadius * 2, $smallNodeRadius * 2)
-      }
-    }
-    finally {
-      $nodeBrush.Dispose()
-    }
-
-    $coreCenter = $points[3]
-    $glowRadius = $tileSize * 0.20
-    $coreGlow = [System.Drawing.Drawing2D.PathGradientBrush]::new([System.Drawing.PointF[]] @(
-      (New-Point ($coreCenter.X - $glowRadius) $coreCenter.Y),
-      (New-Point $coreCenter.X ($coreCenter.Y - $glowRadius)),
-      (New-Point ($coreCenter.X + $glowRadius) $coreCenter.Y),
-      (New-Point $coreCenter.X ($coreCenter.Y + $glowRadius))
+    $lineShadowPath = [System.Drawing.Drawing2D.GraphicsPath]::new()
+    $linePath = [System.Drawing.Drawing2D.GraphicsPath]::new()
+    $lineShadowPath.AddLines([System.Drawing.PointF[]] @(
+      (New-Point ($linePoints[0].X + $Size * 0.008) ($linePoints[0].Y + $Size * 0.012)),
+      (New-Point ($linePoints[1].X + $Size * 0.008) ($linePoints[1].Y + $Size * 0.012)),
+      (New-Point ($linePoints[2].X + $Size * 0.008) ($linePoints[2].Y + $Size * 0.012)),
+      (New-Point ($linePoints[3].X + $Size * 0.008) ($linePoints[3].Y + $Size * 0.012))
     ))
+    $linePath.AddLines($linePoints)
+
     try {
-      $coreGlow.CenterColor = [System.Drawing.Color]::FromArgb(120, 117, 177, 131)
-      $coreGlow.SurroundColors = @([System.Drawing.Color]::Transparent)
-      $graphics.FillEllipse($coreGlow, $coreCenter.X - $glowRadius, $coreCenter.Y - $glowRadius, $glowRadius * 2, $glowRadius * 2)
+      $lineShadowPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(42, 0, 0, 0), [Math]::Max(1.6, $tileSize * 0.12))
+      $lineShadowPen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+      $lineShadowPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+      $lineShadowPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+      try {
+        $graphics.DrawPath($lineShadowPen, $lineShadowPath)
+      }
+      finally {
+        $lineShadowPen.Dispose()
+      }
+
+      $linePen = [System.Drawing.Pen]::new($lineColor, [Math]::Max(1.4, $tileSize * 0.11))
+      $linePen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+      $linePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+      $linePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+      try {
+        $graphics.DrawPath($linePen, $linePath)
+      }
+      finally {
+        $linePen.Dispose()
+      }
     }
     finally {
-      $coreGlow.Dispose()
+      $lineShadowPath.Dispose()
+      $linePath.Dispose()
     }
 
-    $orbRadius = [Math]::Max(2.0, $tileSize * 0.085)
-    $orbBrush = [System.Drawing.Drawing2D.PathGradientBrush]::new([System.Drawing.PointF[]] @(
-      (New-Point ($coreCenter.X - $orbRadius) $coreCenter.Y),
-      (New-Point $coreCenter.X ($coreCenter.Y - $orbRadius)),
-      (New-Point ($coreCenter.X + $orbRadius) $coreCenter.Y),
-      (New-Point $coreCenter.X ($coreCenter.Y + $orbRadius))
-    ))
+    $endPoint = $linePoints[3]
+    $dotRadius = [Math]::Max(1.8, $tileSize * 0.09)
+    $dotBrush = [System.Drawing.SolidBrush]::new($brandGreen)
+    $dotPen = [System.Drawing.Pen]::new($lineColor, [Math]::Max(1.0, $tileSize * 0.018))
     try {
-      $orbBrush.CenterPoint = New-Point ($coreCenter.X - $orbRadius * 0.18) ($coreCenter.Y - $orbRadius * 0.22)
-      $orbBrush.CenterColor = [System.Drawing.Color]::FromArgb(228, 241, 251, 245)
-      $orbBrush.SurroundColors = @($sage)
-      $graphics.FillEllipse($orbBrush, $coreCenter.X - $orbRadius, $coreCenter.Y - $orbRadius, $orbRadius * 2, $orbRadius * 2)
+      $graphics.FillEllipse($dotBrush, $endPoint.X - $dotRadius, $endPoint.Y - $dotRadius, $dotRadius * 2, $dotRadius * 2)
+      $graphics.DrawEllipse($dotPen, $endPoint.X - $dotRadius, $endPoint.Y - $dotRadius, $dotRadius * 2, $dotRadius * 2)
     }
     finally {
-      $orbBrush.Dispose()
-    }
-
-    $orbEdge = [System.Drawing.Pen]::new($frostEdge, [Math]::Max(1.0, $tileSize * 0.018))
-    try {
-      $graphics.DrawEllipse($orbEdge, $coreCenter.X - $orbRadius, $coreCenter.Y - $orbRadius, $orbRadius * 2, $orbRadius * 2)
-    }
-    finally {
-      $orbEdge.Dispose()
-    }
-
-    $specBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(170, 255, 255, 255))
-    try {
-      $graphics.FillEllipse($specBrush, $coreCenter.X - $orbRadius * 0.52, $coreCenter.Y - $orbRadius * 0.62, $orbRadius * 0.62, $orbRadius * 0.46)
-    }
-    finally {
-      $specBrush.Dispose()
+      $dotBrush.Dispose()
+      $dotPen.Dispose()
     }
 
     $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
@@ -332,11 +230,11 @@ function Draw-Icon {
 
 $baseDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $outputs = @(
-  @{ Size = 16; File = 'icon16.png' },
-  @{ Size = 32; File = 'icon32.png' },
-  @{ Size = 48; File = 'icon48.png' },
-  @{ Size = 128; File = 'icon128.png' },
-  @{ Size = 1024; File = 'icon1024.png' }
+  @{ Size = 16; File = "icon16.png" },
+  @{ Size = 32; File = "icon32.png" },
+  @{ Size = 48; File = "icon48.png" },
+  @{ Size = 128; File = "icon128.png" },
+  @{ Size = 1024; File = "icon1024.png" }
 )
 
 foreach ($item in $outputs) {

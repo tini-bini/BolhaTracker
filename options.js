@@ -2,18 +2,33 @@ const {
   BOLHA_PAGE_CONFIG,
   DEFAULT_SETTINGS,
   DONATION_URL,
+  ENTITLEMENT_KEY,
+  FREE_LIMITS,
+  MAX_IMPORT_SIZE_BYTES,
   MESSAGE_TYPES,
+  PLAN,
+  PREMIUM_FEATURES,
+  PREMIUM_LIFETIME_CURRENCY,
+  PREMIUM_LIFETIME_PRICE,
+  getEntitlementState,
+  getFeatureAvailability,
+  isBolhaUrl,
+  isSafeWebUrl,
   REFRESH_INTERVALS,
   buildSparklinePath,
   formatCurrency,
   getPriceAnalytics,
   getTrackedListingStats,
-  getTrackedListings
+  getTrackedListings,
+  isPaymentPending,
+  isPremiumEntitled
 } = globalThis.BolhaTrackerUtils;
 
 const {
   formatRelativeTime,
   formatTimeUntil,
+  getEntitlementCopy,
+  getEntitlementLabel,
   getMessage,
   resolveLocale
 } = globalThis.BolhaTrackerI18n;
@@ -24,8 +39,13 @@ const THEME_KEY = "bolha_tracker_theme";
 
 const state = {
   settings: { ...DEFAULT_SETTINGS },
+  entitlement: { plan: PLAN.FREE },
   trackedItems: [],
-  syncBackupMeta: null
+  syncBackupMeta: null,
+  premiumRestoreDraft: {
+    email: "",
+    restoreCode: ""
+  }
 };
 
 let toastTimer = null;
@@ -36,6 +56,95 @@ function locale() {
 
 function t(key, substitutions) {
   return getMessage(key, locale(), substitutions);
+}
+
+function hasPremium() {
+  return isPremiumEntitled(state.entitlement);
+}
+
+function isPendingPremium() {
+  return isPaymentPending(state.entitlement);
+}
+
+function featureAccess(feature, context) {
+  return getFeatureAvailability(feature, state.entitlement, context);
+}
+
+function entitlementLabel() {
+  return getEntitlementLabel(state.entitlement, locale());
+}
+
+function getPremiumPriceLabel() {
+  return formatCurrency(PREMIUM_LIFETIME_PRICE, PREMIUM_LIFETIME_CURRENCY);
+}
+
+function getPremiumToneClass() {
+  if (hasPremium()) {
+    return "status-dropped";
+  }
+
+  if (state.entitlement && (state.entitlement.status === "payment_failed" || state.entitlement.status === "payment_cancelled" || state.entitlement.status === "entitlement_invalid")) {
+    return "status-unavailable";
+  }
+
+  if (isPendingPremium()) {
+    return "status-increased";
+  }
+
+  return "status-unchanged";
+}
+
+function getRestoreDraft() {
+  return {
+    email: String(state.premiumRestoreDraft && state.premiumRestoreDraft.email ? state.premiumRestoreDraft.email : ""),
+    restoreCode: String(state.premiumRestoreDraft && state.premiumRestoreDraft.restoreCode ? state.premiumRestoreDraft.restoreCode : "")
+  };
+}
+
+function getPremiumDetailsRows() {
+  const rows = [
+    {
+      label: t("premiumInstallCodeLabel"),
+      value: state.entitlement && state.entitlement.installCode ? state.entitlement.installCode : "n/a"
+    }
+  ];
+
+  if (state.entitlement && state.entitlement.checkoutSessionId) {
+    rows.push({
+      label: t("premiumCheckoutLabel"),
+      value: state.entitlement.checkoutSessionId
+    });
+  }
+
+  if (state.entitlement && state.entitlement.maskedEmail) {
+    rows.push({
+      label: t("premiumPurchaseEmailLabel"),
+      value: state.entitlement.maskedEmail
+    });
+  }
+
+  if (state.entitlement && state.entitlement.restoreCode) {
+    rows.push({
+      label: t("premiumRestoreCodeValueLabel"),
+      value: state.entitlement.restoreCode
+    });
+  }
+
+  if (state.entitlement && state.entitlement.lastVerifiedAt) {
+    rows.push({
+      label: t("premiumLastVerifiedLabel"),
+      value: formatRelativeTime(state.entitlement.lastVerifiedAt, locale())
+    });
+  }
+
+  if (state.entitlement && state.entitlement.lastError) {
+    rows.push({
+      label: t("premiumFailureLabel"),
+      value: state.entitlement.lastError
+    });
+  }
+
+  return rows;
 }
 
 function escapeHtml(value) {
@@ -67,6 +176,10 @@ async function toggleTheme() {
   applyTheme(next);
 }
 
+async function loadEntitlement() {
+  state.entitlement = await getEntitlementState();
+}
+
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add("toast-visible");
@@ -80,22 +193,38 @@ function showToast(message) {
   }, 2600);
 }
 
+function openDashboardPage() {
+  chrome.tabs.create({
+    url: chrome.runtime.getURL("popup.html")
+  });
+}
+
 function setStaticCopy() {
   document.getElementById("hero-byline").textContent = t("byline");
   document.getElementById("hero-title").textContent = t("optionsTitle");
   document.getElementById("hero-subtitle").textContent = t("optionsSubtitle");
+  document.getElementById("open-dashboard-button").textContent = t("openDashboardPage");
   document.getElementById("donate-button").textContent = t("donateLink");
   document.getElementById("donate-button").disabled = !DONATION_URL;
   document.getElementById("overview-title").textContent = t("overviewTitle");
   document.getElementById("overview-subtitle").textContent = t("overviewSubtitle");
   document.getElementById("actions-title").textContent = t("actionsTitle");
   document.getElementById("actions-subtitle").textContent = t("actionsSubtitle");
-  document.getElementById("refresh-due-button").textContent = t("refreshDueAction");
+  document.getElementById("premium-title").textContent = t("premiumTitle");
+  document.getElementById("premium-subtitle").textContent = t("premiumSubtitle");
+  document.getElementById("premium-compare-title").textContent = t("premiumCompareTitle");
+  document.getElementById("premium-separate-donate").textContent = t("premiumSeparateDonate");
+  document.getElementById("buy-premium-button").textContent = isPendingPremium() && state.entitlement && state.entitlement.checkoutUrl
+    ? t("premiumCheckoutOpenButton")
+    : t("premiumBuyButton");
+  document.getElementById("already-paid-button").textContent = t("premiumAlreadyPaid");
+  document.getElementById("copy-premium-request-button").textContent = t("premiumCopyRequest");
+  document.getElementById("refresh-due-button").textContent = hasPremium() ? t("refreshDueAction") : t("premiumFeatureBulkRefresh");
   document.getElementById("reset-onboarding-button").textContent = t("resetOnboarding");
   document.getElementById("cloud-title").textContent = t("cloudTitle");
   document.getElementById("cloud-subtitle").textContent = t("cloudSubtitle");
-  document.getElementById("cloud-backup-button").textContent = t("cloudBackupButton");
-  document.getElementById("cloud-restore-button").textContent = t("cloudRestoreButton");
+  document.getElementById("cloud-backup-button").textContent = hasPremium() ? t("cloudBackupButton") : t("premiumBuyButton");
+  document.getElementById("cloud-restore-button").textContent = hasPremium() ? t("cloudRestoreButton") : t("premiumAlreadyPaid");
   document.getElementById("presets-title").textContent = t("presetsTitle");
   document.getElementById("presets-subtitle").textContent = t("presetsSubtitle");
   document.getElementById("guide-title").textContent = t("guideTitle");
@@ -201,7 +330,95 @@ function renderOverview() {
   `;
 }
 
+function buildPremiumSupportRequest() {
+  const details = getPremiumDetailsRows();
+
+  return [
+    "BOLHA Sledilnik cen - Premium diagnostics",
+    `Status: ${entitlementLabel()}`,
+    `Tracked listings: ${state.trackedItems.length}`,
+    ...details.map((entry) => `${entry.label}: ${entry.value}`)
+  ].join("\n");
+}
+
+function renderPremiumSection() {
+  const statusCopy = getEntitlementCopy(state.entitlement, locale());
+  const statusTone = getPremiumToneClass();
+  const restoreDraft = getRestoreDraft();
+  const detailsMarkup = getPremiumDetailsRows()
+    .map((entry) => `
+      <div class="diag-list">
+        <strong>${escapeHtml(entry.label)}</strong>
+        <div>${escapeHtml(entry.value)}</div>
+      </div>
+    `)
+    .join("");
+
+  document.getElementById("premium-status-card").innerHTML = `
+    <div class="diagnostic-output">
+      <div class="diag-list">
+        <strong>${t("premiumPlanStatus")}</strong>
+        <div><span class="status-pill ${statusTone}">${escapeHtml(entitlementLabel())}</span></div>
+      </div>
+      <div class="diag-list">
+        <strong>${t("premiumPayOnce", [getPremiumPriceLabel()])}</strong>
+        <div>${escapeHtml(statusCopy)}</div>
+      </div>
+      <div class="diag-list">
+        <strong>${t("premiumSeparateDonate")}</strong>
+        <div>${escapeHtml(t("premiumSubtitle"))}</div>
+      </div>
+      ${detailsMarkup}
+      <label class="field">
+        <span>${escapeHtml(t("premiumRestoreEmailLabel"))}</span>
+        <input class="input" data-premium-field="email" type="email" value="${escapeHtml(restoreDraft.email)}" autocomplete="email">
+      </label>
+      <label class="field">
+        <span>${escapeHtml(t("premiumRestoreCodeLabel"))}</span>
+        <input class="input" data-premium-field="restoreCode" type="text" value="${escapeHtml(restoreDraft.restoreCode)}" autocapitalize="characters" spellcheck="false">
+      </label>
+      <div>${escapeHtml(t("premiumRestoreHint"))}</div>
+    </div>
+  `;
+
+  document.getElementById("premium-comparison").innerHTML = `
+    <div class="premium-compare-grid">
+      <div class="premium-compare-head">${escapeHtml(t("premiumFreeColumn"))}</div>
+      <div class="premium-compare-head">${escapeHtml(t("premiumPremiumColumn"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureTracked"))}: ${escapeHtml(t("premiumFeatureTrackedFreeValue", [FREE_LIMITS.trackedListings]))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureTracked"))}: ${escapeHtml(t("premiumFeatureTrackedPremiumValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureBulkRefresh"))}: ${escapeHtml(t("premiumFeatureBulkRefreshFreeValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureBulkRefresh"))}: ${escapeHtml(t("premiumFeatureBulkRefreshPremiumValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureNotes"))}: ${escapeHtml(t("premiumFeatureNotesFreeValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureNotes"))}: ${escapeHtml(t("premiumFeatureNotesPremiumValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureSavedViews"))}: ${escapeHtml(t("premiumFeatureSavedViewsFreeValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureSavedViews"))}: ${escapeHtml(t("premiumFeatureSavedViewsPremiumValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureCloud"))}: ${escapeHtml(t("premiumFeatureCloudFreeValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureCloud"))}: ${escapeHtml(t("premiumFeatureCloudPremiumValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureAnalytics"))}: ${escapeHtml(t("premiumFeatureAnalyticsFreeValue"))}</div>
+      <div class="premium-compare-row">${escapeHtml(t("premiumFeatureAnalytics"))}: ${escapeHtml(t("premiumFeatureAnalyticsPremiumValue"))}</div>
+    </div>
+  `;
+
+  document.getElementById("buy-premium-button").disabled = hasPremium();
+  document.getElementById("buy-premium-button").textContent = isPendingPremium() && state.entitlement && state.entitlement.checkoutUrl
+    ? t("premiumCheckoutOpenButton")
+    : t("premiumBuyButton");
+  document.getElementById("already-paid-button").textContent = t("premiumAlreadyPaid");
+  document.getElementById("copy-premium-request-button").textContent = t("premiumCopyRequest");
+}
+
 function renderCloudStatus() {
+  if (!featureAccess(PREMIUM_FEATURES.CLOUD_BACKUP).allowed) {
+    document.getElementById("cloud-status").innerHTML = `
+      <div class="diag-list">
+        <strong>${t("premiumPlanLifetime")}</strong>
+        <div>${t("premiumLockedCloud")}</div>
+      </div>
+    `;
+    return;
+  }
+
   const meta = state.syncBackupMeta;
   document.getElementById("cloud-status").innerHTML = meta
     ? `
@@ -222,9 +439,12 @@ function renderCloudStatus() {
 function renderPresetList() {
   const presets = state.settings.savedViews || [];
   const container = document.getElementById("preset-list");
+  const savedViewAccess = featureAccess(PREMIUM_FEATURES.SAVED_VIEWS, {
+    savedViewCount: presets.length
+  });
 
   if (!presets.length) {
-    container.innerHTML = `<div class="shortcut-card">${t("presetEmpty")}</div>`;
+    container.innerHTML = `<div class="shortcut-card">${savedViewAccess.allowed ? t("presetEmpty") : t("premiumLockedSavedViews", [savedViewAccess.limit])}</div>`;
     return;
   }
 
@@ -245,6 +465,20 @@ function renderAnalytics() {
   const select = document.getElementById("analytics-listing");
   const chart = document.getElementById("analytics-chart");
   const metrics = document.getElementById("analytics-metrics");
+  const analyticsAccess = featureAccess(PREMIUM_FEATURES.ANALYTICS);
+
+  if (!analyticsAccess.allowed) {
+    select.innerHTML = `<option value="">${escapeHtml(t("premiumPlanLifetime"))}</option>`;
+    chart.innerHTML = `<p>${escapeHtml(t("premiumLockedAnalytics"))}</p>`;
+    metrics.innerHTML = `
+      <div class="diag-list">
+        <strong>${escapeHtml(t("premiumPlanLifetime"))}</strong>
+        <div>${escapeHtml(t("premiumFeatureAnalyticsPremiumValue"))}</div>
+      </div>
+    `;
+    return;
+  }
+
   const items = [...state.trackedItems].sort((first, second) => second.dateTracked - first.dateTracked);
   const currentValue = select.value;
 
@@ -308,12 +542,103 @@ function renderAnalytics() {
 }
 
 async function loadSyncStatus() {
+  if (!featureAccess(PREMIUM_FEATURES.CLOUD_BACKUP).allowed) {
+    state.syncBackupMeta = null;
+    renderCloudStatus();
+    return;
+  }
+
   const response = await chrome.runtime.sendMessage({
     type: MESSAGE_TYPES.GET_SYNC_BACKUP_STATUS
   });
 
   state.syncBackupMeta = response && response.ok ? response.meta : null;
   renderCloudStatus();
+}
+
+async function buyPremium() {
+  const response = await chrome.runtime.sendMessage({
+    type: MESSAGE_TYPES.CREATE_CHECKOUT_SESSION
+  });
+
+  if (!response || !response.ok) {
+    showToast(response && response.error ? response.error : t("premiumLockedFeature"));
+    return;
+  }
+
+  state.entitlement = response.entitlement || await getEntitlementState();
+  setStaticCopy();
+  renderPremiumSection();
+  showToast(t("premiumPendingToast"));
+}
+
+async function copyPremiumRequest() {
+  try {
+    await navigator.clipboard.writeText(buildPremiumSupportRequest());
+    state.entitlement = await getEntitlementState();
+    showToast(t("premiumSupportCopied"));
+  } catch (error) {
+    showToast(t("premiumCopyFailed"));
+  }
+}
+
+async function syncOrRestorePremium(forceSync = true, silent = false) {
+  const restoreDraft = getRestoreDraft();
+  const wantsRestore = Boolean(restoreDraft.email || restoreDraft.restoreCode);
+  let response = null;
+
+  if (wantsRestore) {
+    if (!restoreDraft.email || !restoreDraft.restoreCode) {
+      if (!silent) {
+        showToast(t("premiumRestoreHint"));
+      }
+      return null;
+    }
+
+    response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.RESTORE_PREMIUM_ACCESS,
+      payload: restoreDraft
+    });
+  } else {
+    response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.SYNC_ENTITLEMENT,
+      payload: {
+        force: Boolean(forceSync)
+      }
+    });
+  }
+
+  if (response && response.entitlement) {
+    state.entitlement = response.entitlement;
+  } else {
+    state.entitlement = await getEntitlementState();
+  }
+
+  setStaticCopy();
+  renderPremiumSection();
+  renderCloudStatus();
+  renderAnalytics();
+
+  if (!response || !response.ok) {
+    if (!silent) {
+      showToast(response && response.error ? response.error : t("premiumLockedFeature"));
+    }
+    return response;
+  }
+
+  if (wantsRestore) {
+    state.premiumRestoreDraft = {
+      email: "",
+      restoreCode: ""
+    };
+    renderPremiumSection();
+  }
+
+  if (!silent) {
+    showToast(wantsRestore ? t("premiumRestoreToast") : (hasPremium() ? t("premiumActivatedToast") : t("premiumSyncToast")));
+  }
+
+  return response;
 }
 
 async function loadSettings() {
@@ -332,6 +657,7 @@ async function loadSettings() {
   }
 
   setStaticCopy();
+  renderPremiumSection();
   populateSelects();
   renderSettingsForm();
   renderPresetList();
@@ -339,8 +665,27 @@ async function loadSettings() {
 
 async function loadTrackedItems() {
   state.trackedItems = await getTrackedListings();
+  renderPremiumSection();
   renderOverview();
   renderAnalytics();
+}
+
+function handlePremiumStatusInput(event) {
+  const field = event.target.dataset.premiumField;
+
+  if (!field) {
+    return;
+  }
+
+  if (field === "email") {
+    state.premiumRestoreDraft.email = event.target.value.trim();
+    return;
+  }
+
+  if (field === "restoreCode") {
+    state.premiumRestoreDraft.restoreCode = event.target.value.toUpperCase().replace(/\s+/g, "");
+    event.target.value = state.premiumRestoreDraft.restoreCode;
+  }
 }
 
 async function saveSettings() {
@@ -402,6 +747,11 @@ async function importData() {
     return;
   }
 
+  if (file.size > MAX_IMPORT_SIZE_BYTES) {
+    showToast(t("toastImportFailed"));
+    return;
+  }
+
   const text = await file.text();
   let parsed;
 
@@ -440,7 +790,7 @@ async function sendMessageToActiveTab(type) {
     currentWindow: true
   });
 
-  if (!tab || !tab.id) {
+  if (!tab || !tab.id || !isBolhaUrl(tab.url || "")) {
     return null;
   }
 
@@ -487,6 +837,11 @@ async function runDiagnostics() {
 }
 
 async function refreshDueListings() {
+  if (!featureAccess(PREMIUM_FEATURES.BULK_REFRESH).allowed) {
+    showToast(t("premiumLockedBulkRefresh"));
+    return;
+  }
+
   const response = await chrome.runtime.sendMessage({
     type: MESSAGE_TYPES.REFRESH_DUE_LISTINGS
   });
@@ -521,6 +876,11 @@ async function resetOnboarding() {
 }
 
 async function createCloudBackup() {
+  if (!featureAccess(PREMIUM_FEATURES.CLOUD_BACKUP).allowed) {
+    showToast(t("premiumLockedCloud"));
+    return;
+  }
+
   const response = await chrome.runtime.sendMessage({
     type: MESSAGE_TYPES.CREATE_SYNC_BACKUP
   });
@@ -536,6 +896,11 @@ async function createCloudBackup() {
 }
 
 async function restoreCloudBackup() {
+  if (!featureAccess(PREMIUM_FEATURES.CLOUD_BACKUP).allowed) {
+    showToast(t("premiumLockedCloud"));
+    return;
+  }
+
   const response = await chrome.runtime.sendMessage({
     type: MESSAGE_TYPES.RESTORE_SYNC_BACKUP
   });
@@ -573,7 +938,22 @@ async function removePreset(presetId) {
 
 async function init() {
   await loadTheme();
+  await loadEntitlement();
   themeButton.addEventListener("click", toggleTheme);
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") {
+      return;
+    }
+
+    if (changes[ENTITLEMENT_KEY]) {
+      loadEntitlement().then(() => {
+        setStaticCopy();
+        renderPremiumSection();
+        renderCloudStatus();
+        renderAnalytics();
+      });
+    }
+  });
   document.getElementById("save-settings-button").addEventListener("click", saveSettings);
   document.getElementById("export-button").addEventListener("click", exportData);
   document.getElementById("import-button").addEventListener("click", importData);
@@ -582,6 +962,12 @@ async function init() {
   document.getElementById("reset-onboarding-button").addEventListener("click", resetOnboarding);
   document.getElementById("cloud-backup-button").addEventListener("click", createCloudBackup);
   document.getElementById("cloud-restore-button").addEventListener("click", restoreCloudBackup);
+  document.getElementById("buy-premium-button").addEventListener("click", buyPremium);
+  document.getElementById("already-paid-button").addEventListener("click", () => {
+    syncOrRestorePremium(true, false);
+  });
+  document.getElementById("copy-premium-request-button").addEventListener("click", copyPremiumRequest);
+  document.getElementById("premium-status-card").addEventListener("input", handlePremiumStatusInput);
   document.getElementById("preset-list").addEventListener("click", (event) => {
     const button = event.target.closest("[data-preset-remove]");
 
@@ -590,8 +976,9 @@ async function init() {
     }
   });
   document.getElementById("analytics-listing").addEventListener("change", renderAnalytics);
+  document.getElementById("open-dashboard-button").addEventListener("click", openDashboardPage);
   document.getElementById("donate-button").addEventListener("click", () => {
-    if (!DONATION_URL) {
+    if (!DONATION_URL || !isSafeWebUrl(DONATION_URL, { httpsOnly: true, allowHosts: ["paypal.me", "www.paypal.me"] })) {
       showToast(t("donateMissing"));
       return;
     }
@@ -600,6 +987,7 @@ async function init() {
   });
   await loadSettings();
   await loadTrackedItems();
+  await syncOrRestorePremium(false, true);
   await loadSyncStatus();
   renderGuide();
   renderSelectorConfig();

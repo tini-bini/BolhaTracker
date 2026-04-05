@@ -1,9 +1,21 @@
 const {
   DEFAULT_SETTINGS,
   DONATION_URL,
+  ENTITLEMENT_KEY,
+  FREE_LIMITS,
   MESSAGE_TYPES,
+  PLAN,
+  PREMIUM_FEATURES,
+  PREMIUM_LIFETIME_CURRENCY,
+  PREMIUM_LIFETIME_PRICE,
+  getEntitlementState,
+  getFeatureAvailability,
+  isBolhaUrl,
+  isSafeWebUrl,
   REFRESH_INTERVALS,
   STATUS_META,
+  isPremiumEntitled,
+  isPaymentPending,
   buildSparklinePath,
   filterTrackedListings,
   findTrackedListingByUrl,
@@ -16,6 +28,8 @@ const {
 
 const {
   getMessage,
+  getEntitlementCopy,
+  getEntitlementLabel,
   formatRelativeTime,
   formatTimeUntil,
   getPriceDifferenceSummary,
@@ -38,6 +52,7 @@ const elements = {
   headerBadge: document.getElementById("header-badge"),
   summaryGrid: document.getElementById("summary-grid"),
   onboardingPanel: document.getElementById("onboarding-panel"),
+  premiumPanel: document.getElementById("premium-panel"),
   watchlistToolsKicker: document.getElementById("watchlist-tools-kicker"),
   watchlistToolsTitle: document.getElementById("watchlist-tools-title"),
   watchlistToolsSubtitle: document.getElementById("watchlist-tools-subtitle"),
@@ -82,6 +97,7 @@ const elements = {
 
 const state = {
   settings: { ...DEFAULT_SETTINGS },
+  entitlement: { plan: PLAN.FREE },
   currentListing: null,
   currentTrackedItem: null,
   trackedItems: [],
@@ -89,6 +105,10 @@ const state = {
   savingIds: new Set(),
   expandedIds: new Set(),
   metaDrafts: new Map(),
+  premiumRestoreDraft: {
+    email: "",
+    restoreCode: ""
+  },
   refreshDueBusy: false,
   view: loadViewState()
 };
@@ -118,6 +138,95 @@ function locale() {
 
 function t(key, substitutions) {
   return getMessage(key, locale(), substitutions);
+}
+
+function entitlementLabel() {
+  return getEntitlementLabel(state.entitlement, locale());
+}
+
+function hasPremium() {
+  return isPremiumEntitled(state.entitlement);
+}
+
+function isPendingPremium() {
+  return isPaymentPending(state.entitlement);
+}
+
+function featureAccess(feature, context) {
+  return getFeatureAvailability(feature, state.entitlement, context);
+}
+
+function getPremiumPriceLabel() {
+  return formatCurrency(PREMIUM_LIFETIME_PRICE, PREMIUM_LIFETIME_CURRENCY);
+}
+
+function getPremiumToneClass() {
+  if (hasPremium()) {
+    return "status-dropped";
+  }
+
+  if (state.entitlement && (state.entitlement.status === "payment_failed" || state.entitlement.status === "payment_cancelled" || state.entitlement.status === "entitlement_invalid")) {
+    return "status-unavailable";
+  }
+
+  if (isPendingPremium()) {
+    return "status-increased";
+  }
+
+  return "status-unchanged";
+}
+
+function getRestoreDraft() {
+  return {
+    email: String(state.premiumRestoreDraft && state.premiumRestoreDraft.email ? state.premiumRestoreDraft.email : ""),
+    restoreCode: String(state.premiumRestoreDraft && state.premiumRestoreDraft.restoreCode ? state.premiumRestoreDraft.restoreCode : "")
+  };
+}
+
+function getPremiumDetailsRows() {
+  const rows = [
+    {
+      label: t("premiumInstallCodeLabel"),
+      value: state.entitlement && state.entitlement.installCode ? state.entitlement.installCode : "n/a"
+    }
+  ];
+
+  if (state.entitlement && state.entitlement.checkoutSessionId) {
+    rows.push({
+      label: t("premiumCheckoutLabel"),
+      value: state.entitlement.checkoutSessionId
+    });
+  }
+
+  if (state.entitlement && state.entitlement.maskedEmail) {
+    rows.push({
+      label: t("premiumPurchaseEmailLabel"),
+      value: state.entitlement.maskedEmail
+    });
+  }
+
+  if (state.entitlement && state.entitlement.restoreCode) {
+    rows.push({
+      label: t("premiumRestoreCodeValueLabel"),
+      value: state.entitlement.restoreCode
+    });
+  }
+
+  if (state.entitlement && state.entitlement.lastVerifiedAt) {
+    rows.push({
+      label: t("premiumLastVerifiedLabel"),
+      value: formatRelativeTime(state.entitlement.lastVerifiedAt, locale())
+    });
+  }
+
+  if (state.entitlement && state.entitlement.lastError) {
+    rows.push({
+      label: t("premiumFailureLabel"),
+      value: state.entitlement.lastError
+    });
+  }
+
+  return rows;
 }
 
 function showToast(message) {
@@ -161,6 +270,10 @@ async function toggleTheme() {
   const next = current === "light" ? "dark" : "light";
   await chrome.storage.local.set({ [THEME_KEY]: next });
   applyTheme(next);
+}
+
+async function loadEntitlement() {
+  state.entitlement = await getEntitlementState();
 }
 
 function getSettingsPayloadFromForm() {
@@ -212,11 +325,15 @@ function setStaticCopy() {
   elements.watchlistSearchLabel.textContent = t("watchlistSearchLabel");
   elements.watchlistSearch.placeholder = t("watchlistSearchPlaceholder");
   elements.watchlistSortLabel.textContent = t("watchlistSortLabel");
-  elements.saveViewButton.textContent = t("saveViewPreset");
-  elements.refreshDueButton.textContent = state.refreshDueBusy
-    ? t("refreshing")
-    : t("refreshDueButton", [stats.due]);
-  elements.refreshDueButton.disabled = state.refreshDueBusy || !stats.due;
+  elements.saveViewButton.textContent = featureAccess(PREMIUM_FEATURES.SAVED_VIEWS, {
+    savedViewCount: (state.settings.savedViews || []).length
+  }).allowed
+    ? t("saveViewPreset")
+    : t("premiumBuyButton");
+  elements.refreshDueButton.textContent = hasPremium()
+    ? (state.refreshDueBusy ? t("refreshing") : t("refreshDueButton", [stats.due]))
+    : t("premiumFeatureBulkRefresh");
+  elements.refreshDueButton.disabled = state.refreshDueBusy || (hasPremium() ? !stats.due : false);
   elements.openBolhaButton.textContent = t("openBolhaButton");
 
   elements.currentPageKicker.textContent = t("currentPageKicker");
@@ -338,6 +455,15 @@ function renderPresetStrip() {
 }
 
 async function saveViewPreset() {
+  const savedViewAccess = featureAccess(PREMIUM_FEATURES.SAVED_VIEWS, {
+    savedViewCount: (state.settings.savedViews || []).length
+  });
+
+  if (!savedViewAccess.allowed) {
+    showToast(t("premiumLockedSavedViews", [savedViewAccess.limit]));
+    return;
+  }
+
   const name = window.prompt(t("presetPrompt"), state.view.query || "");
 
   if (!name) {
@@ -488,6 +614,66 @@ function renderOnboarding() {
   document.getElementById("onboarding-settings-button").addEventListener("click", () => chrome.runtime.openOptionsPage());
 }
 
+function buildPremiumSupportRequest() {
+  const details = getPremiumDetailsRows();
+
+  return [
+    "BOLHA Sledilnik cen - Premium diagnostics",
+    `Status: ${entitlementLabel()}`,
+    `Tracked listings: ${state.trackedItems.length}`,
+    ...details.map((entry) => `${entry.label}: ${entry.value}`)
+  ].join("\n");
+}
+
+function renderPremiumPanel() {
+  const trackedAccess = featureAccess(PREMIUM_FEATURES.TRACKED_LISTINGS, {
+    trackedCount: state.trackedItems.length
+  });
+  const restoreDraft = getRestoreDraft();
+  const planCopy = getEntitlementCopy(state.entitlement, locale());
+  const detailsMarkup = getPremiumDetailsRows()
+    .map((entry) => `<div class="chip"><strong>${escapeHtml(entry.label)}:</strong> ${escapeHtml(entry.value)}</div>`)
+    .join("");
+  const checkoutButtonLabel = isPendingPremium() && state.entitlement && state.entitlement.checkoutUrl
+    ? t("premiumCheckoutOpenButton")
+    : t("premiumBuyButton");
+  const syncButtonLabel = t("premiumAlreadyPaid");
+
+  elements.premiumPanel.innerHTML = `
+    <div class="section-heading premium-heading">
+      <div>
+        <p class="section-kicker">${escapeHtml(t("premiumStatusKicker"))}</p>
+        <h2>${escapeHtml(t("premiumTitle"))}</h2>
+        <p>${escapeHtml(planCopy)}</p>
+      </div>
+      <span class="status-pill ${getPremiumToneClass()}">${escapeHtml(entitlementLabel())}</span>
+    </div>
+    <div class="premium-copy-row">
+      <span class="chip">${escapeHtml(t("premiumPayOnce", [getPremiumPriceLabel()]))}</span>
+      <span class="chip">${escapeHtml(t("premiumFeatureTrackedFreeValue", [FREE_LIMITS.trackedListings]))}</span>
+      <span class="chip">${escapeHtml(t("premiumSeparateDonate"))}</span>
+    </div>
+    <div class="chip-row">${detailsMarkup}</div>
+    <p class="helper-copy premium-limit-copy">${escapeHtml(t("premiumFeatureTracked"))}: ${escapeHtml(hasPremium() ? t("premiumFeatureTrackedPremiumValue") : t("premiumFeatureTrackedFreeValue", [trackedAccess.limit]))}</p>
+    <div class="command-grid premium-restore-grid">
+      <label class="field">
+        <span class="field-label">${escapeHtml(t("premiumRestoreEmailLabel"))}</span>
+        <input class="input" data-premium-field="email" type="email" value="${escapeHtml(restoreDraft.email)}" autocomplete="email">
+      </label>
+      <label class="field">
+        <span class="field-label">${escapeHtml(t("premiumRestoreCodeLabel"))}</span>
+        <input class="input" data-premium-field="restoreCode" type="text" value="${escapeHtml(restoreDraft.restoreCode)}" autocapitalize="characters" spellcheck="false">
+      </label>
+    </div>
+    <p class="helper-copy">${escapeHtml(t("premiumRestoreHint"))}</p>
+    <div class="button-row premium-actions">
+      <button class="button button-primary" data-premium-action="checkout" type="button" ${hasPremium() ? "disabled" : ""}>${escapeHtml(checkoutButtonLabel)}</button>
+      <button class="button button-secondary" data-premium-action="sync-or-restore" type="button">${escapeHtml(syncButtonLabel)}</button>
+      <button class="button button-secondary button-small" data-premium-action="copy" type="button">${escapeHtml(t("premiumCopyRequest"))}</button>
+    </div>
+  `;
+}
+
 function renderCurrentPageLoading() {
   elements.currentPageContent.innerHTML = `
     <div class="loading-state">
@@ -501,16 +687,24 @@ function renderCurrentPageLoading() {
 function renderCurrentPageCard(listing, trackedItem) {
   const alreadyTracked = Boolean(trackedItem);
   const isUnavailable = listing.available === false;
+  const trackedAccess = featureAccess(PREMIUM_FEATURES.TRACKED_LISTINGS, {
+    trackedCount: state.trackedItems.length
+  });
+  const limitReached = !alreadyTracked && !trackedAccess.allowed;
   const badgeStatus = isUnavailable ? "unavailable" : "unchanged";
   const buttonDisabled = alreadyTracked || isUnavailable;
-  const buttonClass = buttonDisabled ? "button-secondary" : "button-primary";
+  const buttonClass = limitReached ? "button-primary" : (buttonDisabled ? "button-secondary" : "button-primary");
   const buttonText = isUnavailable
     ? t("listingUnavailable")
+    : limitReached
+      ? t("premiumLockedTrackButton")
     : alreadyTracked
       ? t("alreadyTracked")
       : t("trackListing");
   const helperCopy = isUnavailable
     ? t("listingUnavailableHint")
+    : limitReached
+      ? t("premiumLockedTracked", [trackedAccess.limit])
     : alreadyTracked
       ? t("alreadyTrackedHint")
       : t("readyTrackHint");
@@ -538,15 +732,15 @@ function renderCurrentPageCard(listing, trackedItem) {
         <p class="support-copy">${escapeHtml(helperCopy)}</p>
         ${nextCheckCopy}
         <div class="button-row">
-          <button id="track-current-button" class="button ${buttonClass}" type="button" ${buttonDisabled ? "disabled" : ""}>${escapeHtml(buttonText)}</button>
+          <button id="track-current-button" class="button ${buttonClass}" type="button" ${buttonDisabled && !limitReached ? "disabled" : ""}>${escapeHtml(buttonText)}</button>
           <a class="button button-secondary" href="${escapeHtml(listing.url)}" target="_blank" rel="noreferrer">${escapeHtml(t("openLink"))}</a>
         </div>
       </div>
     </article>
   `;
 
-  if (!buttonDisabled) {
-    document.getElementById("track-current-button").addEventListener("click", trackCurrentListing);
+  if (!buttonDisabled || limitReached) {
+    document.getElementById("track-current-button").addEventListener("click", limitReached ? startPremiumCheckout : trackCurrentListing);
   }
 }
 
@@ -623,6 +817,7 @@ function createNotesEditor(item) {
 function createListingCard(item) {
   const refreshing = state.refreshingIds.has(item.id);
   const expanded = state.expandedIds.has(item.id);
+  const canEditNotes = featureAccess(PREMIUM_FEATURES.ADVANCED_NOTES).allowed;
   const difference = getPriceDifferenceSummary(item, locale());
   const statusSummary = getStatusSummary(item, locale());
   const recoverySummary = getRecoverySummary(item, locale());
@@ -681,11 +876,11 @@ function createListingCard(item) {
 
       <div class="listing-actions">
         <button class="button button-secondary" data-action="refresh" data-id="${escapeHtml(item.id)}" type="button" ${refreshing ? "disabled" : ""}>${escapeHtml(refreshing ? t("refreshing") : t("refresh"))}</button>
-        <button class="button button-secondary" data-action="toggle-details" data-id="${escapeHtml(item.id)}" type="button">${escapeHtml(expanded ? t("hideDetails") : t("notesAndTags"))}</button>
+        <button class="button button-secondary" data-action="toggle-details" data-id="${escapeHtml(item.id)}" type="button">${escapeHtml(canEditNotes ? (expanded ? t("hideDetails") : t("notesAndTags")) : t("premiumPlanLifetime"))}</button>
         <button class="button button-danger" data-action="remove" data-id="${escapeHtml(item.id)}" type="button">${escapeHtml(t("remove"))}</button>
       </div>
 
-      ${expanded ? createNotesEditor(item) : ""}
+      ${expanded && canEditNotes ? createNotesEditor(item) : ""}
     </article>
   `;
 }
@@ -720,7 +915,7 @@ async function sendMessageToActiveTab(type) {
     currentWindow: true
   });
 
-  if (!tab || !tab.id) {
+  if (!tab || !tab.id || !isBolhaUrl(tab.url || "")) {
     return null;
   }
 
@@ -729,6 +924,82 @@ async function sendMessageToActiveTab(type) {
   } catch (error) {
     return null;
   }
+}
+
+async function startPremiumCheckout() {
+  const response = await sendRuntimeMessage(MESSAGE_TYPES.CREATE_CHECKOUT_SESSION);
+
+  if (!response || !response.ok) {
+    showToast(response && response.error ? response.error : t("premiumLockedFeature"));
+    return;
+  }
+
+  state.entitlement = response.entitlement || await getEntitlementState();
+  renderPremiumPanel();
+  showToast(t("premiumPendingToast"));
+}
+
+async function copyPremiumRequest() {
+  try {
+    await navigator.clipboard.writeText(buildPremiumSupportRequest());
+    state.entitlement = await getEntitlementState();
+    showToast(t("premiumSupportCopied"));
+  } catch (error) {
+    showToast(t("premiumCopyFailed"));
+  }
+}
+
+async function syncOrRestorePremium(forceSync = true, silent = false) {
+  const restoreDraft = getRestoreDraft();
+  const wantsRestore = Boolean(restoreDraft.email || restoreDraft.restoreCode);
+  let response = null;
+
+  if (wantsRestore) {
+    if (!restoreDraft.email || !restoreDraft.restoreCode) {
+      if (!silent) {
+        showToast(t("premiumRestoreHint"));
+      }
+      return null;
+    }
+
+    response = await sendRuntimeMessage(MESSAGE_TYPES.RESTORE_PREMIUM_ACCESS, restoreDraft);
+  } else {
+    response = await sendRuntimeMessage(MESSAGE_TYPES.SYNC_ENTITLEMENT, {
+      force: Boolean(forceSync)
+    });
+  }
+
+  if (response && response.entitlement) {
+    state.entitlement = response.entitlement;
+  } else {
+    state.entitlement = await getEntitlementState();
+  }
+
+  renderPremiumPanel();
+  setStaticCopy();
+  renderCurrentPage();
+  renderTrackedListings();
+
+  if (!response || !response.ok) {
+    if (!silent) {
+      showToast(response && response.error ? response.error : t("premiumLockedFeature"));
+    }
+    return response;
+  }
+
+  if (wantsRestore) {
+    state.premiumRestoreDraft = {
+      email: "",
+      restoreCode: ""
+    };
+    renderPremiumPanel();
+  }
+
+  if (!silent) {
+    showToast(wantsRestore ? t("premiumRestoreToast") : (hasPremium() ? t("premiumActivatedToast") : t("premiumSyncToast")));
+  }
+
+  return response;
 }
 
 async function loadSettings() {
@@ -741,6 +1012,7 @@ async function loadSettings() {
   populateSelects();
   renderQuickSettings();
   renderOnboarding();
+  renderPremiumPanel();
   renderGuide();
   renderPresetStrip();
   setStaticCopy();
@@ -777,6 +1049,7 @@ async function loadTrackedItems() {
   renderSummary();
   renderFilterStrip();
   renderPresetStrip();
+  renderPremiumPanel();
   setStaticCopy();
   renderCurrentPage();
   renderTrackedListings();
@@ -807,6 +1080,11 @@ async function trackCurrentListing() {
   const response = await sendRuntimeMessage(MESSAGE_TYPES.ADD_TRACKED_LISTING, state.currentListing);
 
   if (!response || !response.ok) {
+    if (response && response.requiresPremium) {
+      showToast(response.error || t("premiumLockedFeature"));
+      return;
+    }
+
     showToast(response && response.error ? response.error : t("toastRefreshFailed"));
     return;
   }
@@ -843,6 +1121,11 @@ async function refreshListing(id) {
 }
 
 async function refreshDueListings() {
+  if (!featureAccess(PREMIUM_FEATURES.BULK_REFRESH).allowed) {
+    showToast(t("premiumLockedBulkRefresh"));
+    return;
+  }
+
   state.refreshDueBusy = true;
   setStaticCopy();
 
@@ -937,6 +1220,11 @@ function toggleExpanded(id) {
     return;
   }
 
+  if (!featureAccess(PREMIUM_FEATURES.ADVANCED_NOTES).allowed) {
+    showToast(t("premiumLockedNotes"));
+    return;
+  }
+
   if (state.expandedIds.has(id)) {
     state.expandedIds.delete(id);
   } else {
@@ -1005,6 +1293,11 @@ function handleFilterClick(event) {
     return;
   }
 
+  if (button.dataset.filter === "notes" && !featureAccess(PREMIUM_FEATURES.ADVANCED_NOTES).allowed) {
+    showToast(t("premiumLockedNotes"));
+    return;
+  }
+
   state.view.filter = button.dataset.filter;
   saveViewState();
   renderFilterStrip();
@@ -1026,6 +1319,48 @@ function handleSettingsFieldChange() {
   setStaticCopy();
 }
 
+function handlePremiumPanelInput(event) {
+  const field = event.target.dataset.premiumField;
+
+  if (!field) {
+    return;
+  }
+
+  if (field === "email") {
+    state.premiumRestoreDraft.email = event.target.value.trim();
+    return;
+  }
+
+  if (field === "restoreCode") {
+    state.premiumRestoreDraft.restoreCode = event.target.value.toUpperCase().replace(/\s+/g, "");
+    event.target.value = state.premiumRestoreDraft.restoreCode;
+  }
+}
+
+function handlePremiumPanelClick(event) {
+  const button = event.target.closest("[data-premium-action]");
+
+  if (!button) {
+    return;
+  }
+
+  const action = button.dataset.premiumAction;
+
+  if (action === "checkout") {
+    startPremiumCheckout();
+    return;
+  }
+
+  if (action === "sync-or-restore") {
+    syncOrRestorePremium(true, false);
+    return;
+  }
+
+  if (action === "copy") {
+    copyPremiumRequest();
+  }
+}
+
 function handleStorageChange(changes, areaName) {
   if (areaName !== "local") {
     return;
@@ -1042,6 +1377,15 @@ function handleStorageChange(changes, areaName) {
   if (changes[THEME_KEY]) {
     applyTheme(changes[THEME_KEY].newValue || "light");
   }
+
+  if (changes[ENTITLEMENT_KEY]) {
+    loadEntitlement().then(() => {
+      renderPremiumPanel();
+      setStaticCopy();
+      renderCurrentPage();
+      renderTrackedListings();
+    });
+  }
 }
 
 async function markDropsSeen() {
@@ -1051,6 +1395,8 @@ async function markDropsSeen() {
 function bindEvents() {
   elements.trackedList.addEventListener("click", handleTrackedListClick);
   elements.trackedList.addEventListener("input", handleTrackedListInput);
+  elements.premiumPanel.addEventListener("click", handlePremiumPanelClick);
+  elements.premiumPanel.addEventListener("input", handlePremiumPanelInput);
   elements.watchlistFilterStrip.addEventListener("click", handleFilterClick);
   elements.watchlistPresets.addEventListener("click", handlePresetClick);
   chrome.storage.onChanged.addListener(handleStorageChange);
@@ -1058,7 +1404,7 @@ function bindEvents() {
   elements.themeButton.addEventListener("click", toggleTheme);
   elements.openOptionsButton.addEventListener("click", () => chrome.runtime.openOptionsPage());
   elements.donateButton.addEventListener("click", () => {
-    if (!DONATION_URL) {
+    if (!DONATION_URL || !isSafeWebUrl(DONATION_URL, { httpsOnly: true, allowHosts: ["paypal.me", "www.paypal.me"] })) {
       showToast(t("donateMissing"));
       return;
     }
@@ -1112,9 +1458,11 @@ function bindEvents() {
 
 async function init() {
   await loadTheme();
+  await loadEntitlement();
   bindEvents();
   await loadSettings();
   await loadTrackedItems();
+  await syncOrRestorePremium(false, true);
   await loadCurrentPage();
   await markDropsSeen();
 }
